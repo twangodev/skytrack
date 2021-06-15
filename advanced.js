@@ -118,7 +118,6 @@ window.onload = () => {
     function updateData(json) {
 
         const productJSON = json.products[product];
-        chart.data.labels = [];
         ['buy-container', 'sell-container'].forEach((containerID, index) => {
             const qs = productJSON.quick_status
             const type = containerID.replace('-container', '')
@@ -138,8 +137,8 @@ window.onload = () => {
             const q3 = getQuantile(sortedPPU, 75)
 
             const iqr = q3 - q1
-            const max = q3 + iqr * 1.5
-            const min = q1 - iqr * 1.5
+            const max = q3 + iqr * 0.05
+            const min = q1 - iqr * 0.05
 
             const summaryDataWO = summaryData.filter(item => (item.pricePerUnit >= min) && (item.pricePerUnit <= max))
 

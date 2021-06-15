@@ -137,7 +137,7 @@ window.onload = () => {
             const q3 = getQuantile(sortedPPU, 75)
 
             const iqr = q3 - q1
-            const max = q3 + iqr * 0.075
+            const max = q3 + iqr * 0.05
             const min = q1 - iqr * 1.5
 
             const summaryDataWO = summaryData.filter(item => (item.pricePerUnit >= min) && (item.pricePerUnit <= max))

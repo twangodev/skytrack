@@ -1,0 +1,237 @@
+@import url('https://fonts.googleapis.com/css2?family=Rubik:wght@400;700&display=swap');
+
+body {
+    background-color: #2E3440;
+    margin: 0;
+    padding: 0;
+    color: rgb(236, 239, 244);
+    font-family: 'Rubik', sans-serif;
+}
+
+a {
+    text-decoration: none;
+    color: inherit;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+.live-indicator {
+    font-family: 'Rubik', sans-serif;
+    background: #ea2429;
+    color: #fff;
+    padding: 6px 7px;
+    line-height: 1;
+    border-radius: 6px;
+    text-transform: uppercase;
+    display: inline-block;
+    vertical-align: middle;
+    font-size: 12px;
+    font-weight: bold;
+    width: auto;
+    margin-left: 10px;
+}
+.live-indicator .blink {
+    animation: blinker 0.5s cubic-bezier(0.5, 0, 1, 1) infinite alternate;
+    font-size: 10px;
+    margin-right: 5px;
+    vertical-align: baseline;
+}
+@keyframes blinker {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+.center {
+    text-align: center;
+}
+
+.header-element {
+    margin: 40px;
+    font-size: 2.56578em;
+    font-weight: bold;
+    letter-spacing: 3px;
+}
+
+#item-selector-container {
+    text-align: center;
+    padding: 40px;
+}
+
+.item-selector-header {
+    margin: 20px;
+    font-size: 1.7em;
+}
+
+.item-selector {
+    width: 20%;
+    display: inline-block;
+    margin: 0.4em 0.25em;
+    text-align: center;
+    text-decoration: none;
+    vertical-align: middle;
+    border-radius: 0.25em;
+    padding: 0.375em 0.75em;
+    transition: background-color 200ms ease-in 0s, border-color 200ms ease-in 0s, box-shadow 200ms ease-in 0s, color 200ms ease-in 0s;
+    border: 0.0625em solid rgb(76, 86, 106);
+    color: rgb(236, 239, 244);
+}
+
+.item-selector:hover {
+    border-color: rgb(121, 184, 202);
+}
+
+.advanced-header-container {
+    display: inline
+}
+
+#advanced-header {
+    font-size: 1.7em;
+}
+
+.chart-container {
+    height: 400px;
+    width: 98%;
+    margin: 20px 0;
+}
+
+#data {
+    margin: 40px;
+}
+
+#error-container {
+    margin: 40px;
+    background-color: #2E3440;
+    box-shadow: rgb(15 17 21 / 20%) 0 3px 6px 0;
+    border-radius: 0.5em;
+    transition: box-shadow 400ms ease-in-out 0s, background-color 400ms ease-in-out 0s;
+    overflow: hidden;
+}
+
+.error-container:hover {
+    box-shadow: rgb(15 17 21 / 20%) 0 6px 12px 0;
+}
+
+#error-header {
+    font-size: 1.7em;
+    color: #BF616A
+}
+
+.buy-sell-container {
+    position: relative;
+    float: left;
+    display: inline-block;
+    width: 49%;
+    box-shadow: rgb(15 17 21 / 20%) 0 3px 6px 0;
+    transition: box-shadow 400ms ease-in-out 0s, background-color 400ms ease-in-out 0s, transform 300ms ease-in-out 0s;
+    margin: 0 0 40px;
+}
+
+.buy-sell-container:hover {
+    box-shadow: rgb(15 17 21 / 40%) 0 6px 12px 0;
+    transform: translate(0, -5px);
+}
+
+#buy-container {
+    border-radius: 0.5em 0 0 0.5em;
+    background-color: rgba(191, 97, 106, 0.4);
+}
+
+#sell-container {
+    border-radius: 0 0.5em 0.5em 0;
+    background-color: rgba(163, 190, 140, 0.4);
+}
+
+.buy-sell-container-header {
+    font-size: 20px;
+    margin: 10px 0 10px 0;
+}
+
+.quick-statistics-container {
+    text-align: center;
+    color: white;
+    margin-bottom: 30px;
+}
+
+.quick-statistic {
+    text-align: left;
+    border-radius: 0.25em;
+    margin: 0 6px;
+    width: 19%;
+    display: inline-block;
+    background-color: #2E3440;
+    padding: 10px 16px;
+}
+
+.quick-statistic-header {
+    font-size: 12px;
+}
+
+.quick-statistic-value {
+    font-size: 24px;
+}
+
+.up {
+    color: #A3BE8C
+}
+
+.down {
+    color: #BF616A
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    border-radius: 0.25em;
+
+}
+
+th {
+    width: 19%;
+    font-weight: normal;
+    text-align: left;
+    padding: 10px 16px;
+    font-size: 18px;
+}
+
+td {
+    width: 19%;
+    margin: 0;
+    font-weight: normal;
+    text-align: left;
+    padding: 2px 16px;
+    font-size: 16px;
+}
+
+tr {
+    background-color: rgba(46, 52, 64, 0.6);
+}
+
+tr:nth-child(even) {
+    background-color: rgba(46, 52, 64, 0.3);
+}
+
+@media only screen and (max-width: 1680px) {
+
+    .buy-sell-container {
+        width: 100%;
+    }
+
+    .buy-sell-container:hover {
+        transform: translate(0, 0);
+    }
+
+    #buy-container {
+        border-radius: 0.5em 0.5em 0 0;
+    }
+
+    #sell-container {
+        border-radius: 0 0 0.5em 0.5em;
+    }
+
+}

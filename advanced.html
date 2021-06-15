@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SkyTrack - Advanced Tracker</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.0.6/css/all.css">
+
+    <script src="api.js"></script>
+    <script src="advanced.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.3.2/chart.min.js" integrity="sha512-VCHVc5miKoln972iJPvkQrUYYq7XpxXzvqNfiul1H4aZDwGBGC0lq373KNleaB2LpnC2a/iNfE5zoRYmB4TRDQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+</head>
+<body>
+    <h1 class="center header-element"><a href="index">SkyTrack</a></h1>
+    <div id="data">
+        <h2 id="advanced-header" class="center"></h2>
+        <div class="chart-container">
+            <canvas id="chart"></canvas>
+        </div>
+        <div id="buy-container" class="buy-sell-container">
+            <div class="center buy-sell-container-header">Sell (Bid)</div>
+            <div class="quick-statistics-container">
+                <div class="quick-statistic">
+                    <div class="quick-statistic-header">Price</div>
+                    <div id="sell-container-price" class="quick-statistic-value">0.0</div>
+                </div>
+                <div class="quick-statistic">
+                    <div class="quick-statistic-header">Volume</div>
+                    <div id="sell-container-volume" class="quick-statistic-value">0.0</div>
+                </div>
+                <div class="quick-statistic">
+                    <div class="quick-statistic-header">Moving Week</div>
+                    <div id="sell-container-moving-week" class="quick-statistic-value">0.0</div>
+                </div>
+                <div class="quick-statistic">
+                    <div class="quick-statistic-header">Pending Transactions</div>
+                    <div id="sell-container-orders" class="quick-statistic-value">0.0</div>
+                </div>
+            </div>
+            <table id="buy-table">
+                <tr>
+                    <th>Price Per Unit (PPU)</th>
+                    <th>Orders</th>
+                    <th>Amount</th>
+                    <th>Market Value</th>
+                </tr>
+            </table>
+
+        </div>
+        <div id="sell-container" class="buy-sell-container">
+            <div class="center buy-sell-container-header">Buy (Ask)</div>
+            <div class="quick-statistics-container">
+                <div class="quick-statistic">
+                    <div class="quick-statistic-header">Price</div>
+                    <div id="buy-container-price" class="quick-statistic-value">0.0</div>
+                </div>
+                <div class="quick-statistic">
+                    <div class="quick-statistic-header">Volume</div>
+                    <div id="buy-container-volume" class="quick-statistic-value">0.0</div>
+                </div>
+                <div class="quick-statistic">
+                    <div class="quick-statistic-header">Moving Week</div>
+                    <div id="buy-container-moving-week" class="quick-statistic-value">0.0</div>
+                </div>
+                <div class="quick-statistic">
+                    <div class="quick-statistic-header">Pending Transactions</div>
+                    <div id="buy-container-orders" class="quick-statistic-value">0.0</div>
+                </div>
+            </div>
+            <table id="sell-table">
+                <tr>
+                    <th>Price Per Unit (PPU)</th>
+                    <th>Orders</th>
+                    <th>Amount</th>
+                    <th>Market Value</th>
+                </tr>
+            </table>
+        </div>
+    </div>
+    <div id="error-container" style="display: none">
+        <h2 id="error-header" class="center"></h2>
+    </div>
+</body>
+</html>

@@ -1,3 +1,5 @@
 # hypixel-skytrack
+The leading Hypixel Skyblock price tracker. Stay updated with market trends, item values, and trade insights.
 
-Allows you to track HyPixel Skyblock prices easily. Visit [skytrack.twango.dev](https://skytrack.twango.dev) to preview.
+## Preview
+Visit [skytrack.twango.dev](https://skytrack.twango.dev) to preview.

@@ -1,2 +1,2 @@
-requests~=2.31.0
-sitemap~=20191121
+requests==2.31.0
+sitemap==20191121

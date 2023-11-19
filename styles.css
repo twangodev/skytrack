@@ -17,6 +17,14 @@ a:hover {
     text-decoration: underline;
 }
 
+.link {
+    color: #88C0D0;
+}
+
+.link:hover {
+    color: #5E81AC
+}
+
 .live-indicator {
     font-family: 'Rubik', sans-serif;
     background: #ea2429;

@@ -17,6 +17,7 @@
 		<a href="/auctions" class="transition-colors hover:text-text">auctions</a>
 		<a href="/flips" class="transition-colors hover:text-text">flips</a>
 		<a href="/movers" class="transition-colors hover:text-text">movers</a>
+		<a href="/compare" class="transition-colors hover:text-text">compare</a>
 		<ThemeToggle />
 	</nav>
 </header>

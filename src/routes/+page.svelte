@@ -31,11 +31,7 @@
 		<div class="w-full max-w-lg">
 			<ItemSearch />
 		</div>
-		<p class="flex items-center gap-2 text-xs text-muted">
-			<LastUpdated at={data.lastUpdated} />
-			<span aria-hidden="true">·</span>
-			<a href="/compare" class="transition-colors hover:text-accent">compare items &rarr;</a>
-		</p>
+		<p class="text-xs text-muted"><LastUpdated at={data.lastUpdated} /></p>
 	</section>
 
 	<section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -162,7 +158,7 @@
 			<div class="flex items-baseline justify-between">
 				<h2 class="text-sm font-medium text-muted">Top movers today</h2>
 				<a href="/movers" class="text-xs text-muted transition-colors hover:text-accent">
-					view all &rarr;
+					view all
 				</a>
 			</div>
 			<div class="grid gap-3 sm:grid-cols-3">

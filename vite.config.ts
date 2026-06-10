@@ -11,7 +11,7 @@ function ensureMarketData(): Plugin {
 	return {
 		name: 'ensure-market-data',
 		buildStart() {
-			if (!existsSync('src/lib/data/bazaar.json')) {
+			if (existsSync('scripts/fetch-data.ts') && !existsSync('src/lib/data/bazaar.json')) {
 				execSync('bun scripts/fetch-data.ts', { stdio: 'inherit' });
 			}
 		}

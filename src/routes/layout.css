@@ -1,0 +1,70 @@
+@import 'tailwindcss';
+
+/* dark: utilities follow the .dark class mode-watcher toggles, not the OS
+   media query; otherwise an OS-dark visitor who switches the site to light
+   gets dark-variant text colors on the light background. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@font-face {
+	font-family: 'Overused Grotesk';
+	src: url('/fonts/OverusedGrotesk-VF.woff2') format('woff2');
+	font-weight: 300 900;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'Overused Grotesk';
+	src: url('/fonts/OverusedGroteskItalic-VF.woff2') format('woff2');
+	font-weight: 400;
+	font-style: italic;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'JetBrains Mono';
+	src: url('/fonts/JetBrainsMono-VF.woff2') format('woff2');
+	font-weight: 100 800;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'JetBrains Mono';
+	src: url('/fonts/JetBrainsMono-Italic-VF.woff2') format('woff2');
+	font-weight: 100 800;
+	font-style: italic;
+	font-display: swap;
+}
+
+@theme {
+	--font-sans: 'Overused Grotesk', system-ui, sans-serif;
+	--font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+	--color-bg: #f8f6f1;
+	--color-surface: #efede7;
+	--color-text: #1a1916;
+	--color-muted: #8a8578;
+	--color-subtle: #e2dfd8;
+	--color-accent: #167bff;
+
+	--color-up: #2e8a57;
+	--color-down: #c2453e;
+
+	--color-background: var(--color-bg);
+	--color-foreground: var(--color-text);
+	--color-muted-foreground: var(--color-muted);
+	--color-border: var(--color-subtle);
+}
+
+:root.dark {
+	--color-bg: #1a1916;
+	--color-surface: #23221e;
+	--color-text: #e8e5df;
+	--color-muted: #7a7568;
+	--color-subtle: #2e2d28;
+	--color-accent: #167bff;
+
+	--color-up: #5bbd84;
+	--color-down: #e07a70;
+}

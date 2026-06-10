@@ -4,7 +4,12 @@
 import { mkdir, readdir, readFile, writeFile, appendFile, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import type { ZodType } from 'zod';
-import { bazaarResponse, auctionsPage, itemsResponse, type RawAuction } from '../src/lib/hypixel/types';
+import {
+	bazaarResponse,
+	auctionsPage,
+	itemsResponse,
+	type RawAuction
+} from '../src/lib/hypixel/types';
 import { BAZAAR_URL, AUCTIONS_URL, ITEMS_URL } from '../src/lib/hypixel/endpoints';
 import { aggregateBins, toSnapshot, type DecodedBin } from '../src/lib/market/aggregate';
 import { itemIdFromBytes } from '../src/lib/hypixel/nbt';
@@ -84,10 +89,8 @@ async function compactHistory(kind: 'bazaar' | 'auctions', today: string) {
 
 async function fetchItems(): Promise<Record<string, { name: string }>> {
 	const data = await fetchJson(ITEMS_URL, itemsResponse);
-	const items: Record<
-		string,
-		{ name: string; tier?: string; category?: string; npc?: number }
-	> = {};
+	const items: Record<string, { name: string; tier?: string; category?: string; npc?: number }> =
+		{};
 	for (const item of data.items) {
 		items[item.id] = {
 			name: item.name,

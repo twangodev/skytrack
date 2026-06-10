@@ -8,7 +8,6 @@ const config = {
 			fallback: '404.html'
 		}),
 		prerender: {
-			handleHttpError: 'warn',
 			concurrency: 8
 		}
 	},

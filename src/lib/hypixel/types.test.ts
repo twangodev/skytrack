@@ -64,7 +64,9 @@ describe('itemsResponse', () => {
 		const parsed = itemsResponse.parse({
 			success: true,
 			lastUpdated: 0,
-			items: [{ id: 'ASPECT_OF_THE_END', name: 'Aspect of the End', tier: 'RARE', material: 'SWORD' }]
+			items: [
+				{ id: 'ASPECT_OF_THE_END', name: 'Aspect of the End', tier: 'RARE', material: 'SWORD' }
+			]
 		});
 		expect(parsed.items[0].name).toBe('Aspect of the End');
 	});

@@ -49,7 +49,10 @@ export function stepPath(points: Point[], xd: Domain, yd: Domain, w: number, h: 
 export function linePath(points: Point[], xd: Domain, yd: Domain, w: number, h: number): string {
 	if (points.length === 0) return '';
 	return points
-		.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${fmt(scale(x, xd, [0, w]))},${fmt(scale(y, yd, [h, 0]))}`)
+		.map(
+			([x, y], i) =>
+				`${i === 0 ? 'M' : 'L'}${fmt(scale(x, xd, [0, w]))},${fmt(scale(y, yd, [h, 0]))}`
+		)
 		.join('');
 }
 

@@ -54,7 +54,9 @@
 		</p>
 	</div>
 
-	<dl class="grid grid-cols-1 gap-px overflow-hidden rounded-lg border border-subtle bg-subtle sm:grid-cols-3">
+	<dl
+		class="grid grid-cols-1 gap-px overflow-hidden rounded-lg border border-subtle bg-subtle sm:grid-cols-3"
+	>
 		{#each cells as cell (cell.label)}
 			<div class="flex flex-col gap-0.5 bg-surface px-4 py-3">
 				<dt class="text-xs text-muted">{cell.label}</dt>

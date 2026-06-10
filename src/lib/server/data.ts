@@ -42,9 +42,12 @@ function cached<T>(key: string, compute: () => T): T {
 
 const readJson = <T>(path: string): T => JSON.parse(readFileSync(path, 'utf8')) as T;
 
-export const loadItems = () => cached('items', () => readJson<Record<string, ItemMeta>>(`${DATA_DIR}/items.json`));
-export const loadBazaar = () => cached('bazaar', () => readJson<BazaarFile>(`${DATA_DIR}/bazaar.json`));
-export const loadAuctions = () => cached('auctions', () => readJson<AuctionsFile>(`${DATA_DIR}/auctions.json`));
+export const loadItems = () =>
+	cached('items', () => readJson<Record<string, ItemMeta>>(`${DATA_DIR}/items.json`));
+export const loadBazaar = () =>
+	cached('bazaar', () => readJson<BazaarFile>(`${DATA_DIR}/bazaar.json`));
+export const loadAuctions = () =>
+	cached('auctions', () => readJson<AuctionsFile>(`${DATA_DIR}/auctions.json`));
 
 export const bazaarSlugMap = () =>
 	cached('bazaarSlugs', () => buildSlugMap(Object.keys(loadBazaar().products)));

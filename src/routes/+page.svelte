@@ -8,8 +8,7 @@
 
 	const { data } = $props();
 
-	const pct = (change: number) =>
-		`${change > 0 ? '+' : ''}${(change * 100).toFixed(1)}%`;
+	const pct = (change: number) => `${change > 0 ? '+' : ''}${(change * 100).toFixed(1)}%`;
 </script>
 
 <SEO canonical="/" />

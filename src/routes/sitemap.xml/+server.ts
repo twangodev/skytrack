@@ -17,7 +17,9 @@ export const GET: RequestHandler = () => {
 	const body = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${urls
-	.map((u) => `\t<url><loc>${site.url}${u === '/' ? '' : u}</loc><lastmod>${lastmod}</lastmod></url>`)
+	.map(
+		(u) => `\t<url><loc>${site.url}${u === '/' ? '' : u}</loc><lastmod>${lastmod}</lastmod></url>`
+	)
 	.join('\n')}
 </urlset>`;
 

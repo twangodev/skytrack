@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Search } from '@lucide/svelte';
+	import { browser } from '$app/environment';
 	import { page } from '$app/state';
 
 	export interface SearchItem {
@@ -14,7 +15,8 @@
 
 	const { items }: Props = $props();
 
-	let query = $state(page.url.searchParams.get('q') ?? '');
+	// searchParams are unavailable while prerendering
+	let query = $state(browser ? (page.url.searchParams.get('q') ?? '') : '');
 	let selected = $state(0);
 	let focused = $state(false);
 

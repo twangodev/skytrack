@@ -67,14 +67,17 @@
 							</a>
 						</td>
 						<td class="py-1.5 pr-4"><RarityBadge tier={row.tier} /></td>
-						<td class="py-1.5 pr-4 text-right font-mono tabular-nums">{formatPrice(row.lowestBin)}</td>
-						<td class="py-1.5 pr-4 text-right font-mono tabular-nums text-muted"
+						<td class="py-1.5 pr-4 text-right font-mono tabular-nums"
+							>{formatPrice(row.lowestBin)}</td
+						>
+						<td class="py-1.5 pr-4 text-right font-mono text-muted tabular-nums"
 							>{formatPrice(row.medianBin)}</td
 						>
-						<td class="py-1.5 text-right font-mono tabular-nums text-muted">{row.count}</td>
+						<td class="py-1.5 text-right font-mono text-muted tabular-nums">{row.count}</td>
 					</tr>
 				{:else}
-					<tr><td colspan="5" class="py-8 text-center text-muted">No items match “{query}”.</td></tr>
+					<tr><td colspan="5" class="py-8 text-center text-muted">No items match “{query}”.</td></tr
+					>
 				{/each}
 			</tbody>
 		</table>

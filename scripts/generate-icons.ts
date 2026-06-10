@@ -22,7 +22,10 @@ const rounded = `
 </svg>`;
 
 const render = (svg: string, size: number) =>
-	sharp(Buffer.from(svg), { density: (72 * size) / 32 }).resize(size, size).png().toBuffer();
+	sharp(Buffer.from(svg), { density: (72 * size) / 32 })
+		.resize(size, size)
+		.png()
+		.toBuffer();
 
 await writeFile('static/apple-touch-icon.png', await render(mark(0), 180));
 await writeFile('static/icon-192.png', await render(rounded, 192));

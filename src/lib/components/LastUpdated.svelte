@@ -24,7 +24,8 @@
 <span class="inline-flex items-center gap-1.5 whitespace-nowrap">
 	{#if live}
 		<span class="relative flex size-1.5" aria-hidden="true">
-			<span class="absolute inline-flex size-full animate-ping rounded-full bg-up opacity-60"></span>
+			<span class="absolute inline-flex size-full animate-ping rounded-full bg-up opacity-60"
+			></span>
 			<span class="relative inline-flex size-1.5 rounded-full bg-up"></span>
 		</span>
 		<span class="text-up">live</span>

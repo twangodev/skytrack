@@ -22,9 +22,6 @@
 	const label = $derived(tier.replaceAll('_', ' '));
 </script>
 
-<span
-	class="font-mono text-[10px] tracking-widest uppercase"
-	style="color: {color}"
->
+<span class="font-mono text-[10px] tracking-widest uppercase" style="color: {color}">
 	{label}
 </span>

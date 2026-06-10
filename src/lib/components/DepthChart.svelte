@@ -93,13 +93,19 @@
 				text-anchor={hover.x > W / 2 ? 'end' : 'start'}
 				class="fill-text font-mono text-[11px]"
 			>
-				{formatPrice(hover.price)} · {formatCompact(hover.depth)} {hover.side === 'bid' ? 'bid' : 'ask'}
+				{formatPrice(hover.price)} · {formatCompact(hover.depth)}
+				{hover.side === 'bid' ? 'bid' : 'ask'}
 			</text>
 		{/if}
 
 		<!-- x axis labels -->
 		<text x="0" y={H - 4} class="fill-muted font-mono text-[10px]">{formatPrice(xd[0])}</text>
-		<text x={scale(mid, xd, [0, W])} y={H - 4} text-anchor="middle" class="fill-muted font-mono text-[10px]">
+		<text
+			x={scale(mid, xd, [0, W])}
+			y={H - 4}
+			text-anchor="middle"
+			class="fill-muted font-mono text-[10px]"
+		>
 			{formatPrice(mid)}
 		</text>
 		<text x={W} y={H - 4} text-anchor="end" class="fill-muted font-mono text-[10px]">

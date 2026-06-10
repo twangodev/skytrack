@@ -22,7 +22,9 @@
 	]);
 </script>
 
-<dl class="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-subtle bg-subtle sm:grid-cols-4">
+<dl
+	class="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-subtle bg-subtle sm:grid-cols-4"
+>
 	{#each stats as stat (stat.label)}
 		<div class="flex flex-col gap-0.5 bg-surface px-4 py-3">
 			<dt class="text-xs text-muted">{stat.label}</dt>

@@ -67,15 +67,18 @@
 						</td>
 						<td class="py-1.5 pr-4 text-right font-mono tabular-nums">{formatPrice(row.bp)}</td>
 						<td class="py-1.5 pr-4 text-right font-mono tabular-nums">{formatPrice(row.sp)}</td>
-						<td class="py-1.5 pr-4 text-right font-mono tabular-nums text-muted"
+						<td class="py-1.5 pr-4 text-right font-mono text-muted tabular-nums"
 							>{formatCompact(row.bmw)}</td
 						>
-						<td class="py-1.5 text-right font-mono tabular-nums text-muted"
+						<td class="py-1.5 text-right font-mono text-muted tabular-nums"
 							>{formatCompact(row.smw)}</td
 						>
 					</tr>
 				{:else}
-					<tr><td colspan="5" class="py-8 text-center text-muted">No products match “{query}”.</td></tr>
+					<tr
+						><td colspan="5" class="py-8 text-center text-muted">No products match “{query}”.</td
+						></tr
+					>
 				{/each}
 			</tbody>
 		</table>

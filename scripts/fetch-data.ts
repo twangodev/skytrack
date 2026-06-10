@@ -92,7 +92,9 @@ async function restoreState(): Promise<MarketState> {
 		}
 		const decoded = decodeStateFile(bytes);
 		if (decoded.kind !== kind || decoded.tier !== tier) {
-			throw new Error(`state file ${name} has unexpected kind/tier ${decoded.kind}/${decoded.tier}`);
+			throw new Error(
+				`state file ${name} has unexpected kind/tier ${decoded.kind}/${decoded.tier}`
+			);
 		}
 		const target = state[kind] as Record<string, Map<string, unknown[]>>;
 		target[tier] = decoded.items;

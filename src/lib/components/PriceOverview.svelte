@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { Area, Chart, Highlight, LinearGradient, Rule, Spline, Svg, Tooltip } from 'layerchart';
 	import { scaleTime } from 'd3-scale';
+	import { browser } from '$app/environment';
 	import { formatPrice } from '$lib/format';
 	import type { Point } from '$lib/market/chart';
+	import { mergedSeries, type ItemSeriesJson } from '$lib/market/series';
 
 	interface Series {
 		label: string;
@@ -13,13 +15,55 @@
 		/** hero price; reactive on bazaar pages so it ticks live */
 		current: number;
 		unit?: string;
-		/** drives the hero change, chart color, and area */
+		/** which /data/items endpoint backs the chart */
+		slug: string;
+		kind: 'bazaar' | 'auctions';
+		/** SSR fallback + live tail; drives hero change & colors until the fetch lands */
 		primary: Series;
 		/** optional thin reference line (instasell, median BIN) */
 		secondary?: Series;
 	}
 
-	const { current, unit = 'coins', primary, secondary }: Props = $props();
+	const { current, unit = 'coins', slug, kind, primary, secondary }: Props = $props();
+
+	// full-history endpoint, fetched once per item and shared across range tabs
+	const seriesCache = new Map<string, Promise<ItemSeriesJson | null>>();
+	function loadSeries(itemSlug: string): Promise<ItemSeriesJson | null> {
+		let pending = seriesCache.get(itemSlug);
+		if (!pending) {
+			pending = fetch(`/data/items/${itemSlug}.json`)
+				.then((res) => (res.ok ? (res.json() as Promise<ItemSeriesJson>) : null))
+				.catch(() => null);
+			seriesCache.set(itemSlug, pending);
+		}
+		return pending;
+	}
+
+	let fetched = $state<ItemSeriesJson | null>(null);
+	$effect(() => {
+		const target = slug;
+		fetched = null;
+		if (!browser) return;
+		void loadSeries(target).then((data) => {
+			if (target === slug) fetched = data;
+		});
+	});
+
+	// fetched history + any SSR/live points newer than its newest sample
+	const merged = $derived(fetched ? mergedSeries(fetched, kind) : []);
+	const primaryPoints = $derived.by((): Point[] => {
+		if (merged.length === 0) return primary.points;
+		const newest = merged[merged.length - 1][0];
+		const freshTail = primary.points.filter(([t]) => t > newest);
+		return [...merged.map(([t, a]) => [t, a] as Point), ...freshTail];
+	});
+	const secondaryPoints = $derived.by((): Point[] => {
+		if (!secondary) return [];
+		if (merged.length === 0) return secondary.points;
+		const newest = merged[merged.length - 1][0];
+		const freshTail = secondary.points.filter(([t]) => t > newest);
+		return [...merged.map(([t, , b]) => [t, b] as Point), ...freshTail];
+	});
 
 	const RANGES = [
 		{ key: '1D', label: '1D', seconds: 86_400 },
@@ -39,14 +83,12 @@
 
 	const visible = $derived.by(() => {
 		const selected = RANGES.find((r) => r.key === range) ?? RANGES[3];
-		const points = clip(primary.points, selected.seconds);
+		const points = clip(primaryPoints, selected.seconds);
 		// a range with under two points can't show change — widen to everything
-		return points.length >= 2 ? points : primary.points;
+		return points.length >= 2 ? points : primaryPoints;
 	});
 	const visibleSecondary = $derived(
-		secondary
-			? clip(secondary.points, (RANGES.find((r) => r.key === range) ?? RANGES[3]).seconds)
-			: []
+		clip(secondaryPoints, (RANGES.find((r) => r.key === range) ?? RANGES[3]).seconds)
 	);
 
 	const open = $derived(visible[0]?.[1] ?? current);

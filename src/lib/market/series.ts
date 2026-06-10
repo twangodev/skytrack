@@ -1,14 +1,16 @@
 import type { MarketState, BazaarPoint, AuctionPoint } from './state';
 
-/** intraday slice of the raw tier exposed to charts (1D view + headroom) */
-export const INTRADAY_WINDOW = 48 * 3_600;
-
 /** columnar tuples: bazaar [t, instabuy, instasell]; auctions [t, lowest, median, count] */
 export type BazaarTuple = [t: number, b: number, s: number];
 export type AuctionTuple = [t: number, l: number, m: number, c: number];
 
+/**
+ * Per-item chart endpoint. Tiers mirror the state tiers and are disjoint in
+ * time (raw: last 30d @15min, hourly: 30–120d, daily: older) — clients concat
+ * and slice ranges from the merged series.
+ */
 export interface ItemSeriesJson {
-	bazaar?: { intraday: BazaarTuple[]; hourly: BazaarTuple[]; daily: BazaarTuple[] };
+	bazaar?: { raw: BazaarTuple[]; hourly: BazaarTuple[]; daily: BazaarTuple[] };
 	auctions?: { raw: AuctionTuple[]; daily: AuctionTuple[] };
 }
 
@@ -22,9 +24,8 @@ export function itemSeries(state: MarketState, id: string): ItemSeriesJson {
 	const hourly = state.bazaar.hourly.get(id);
 	const daily = state.bazaar.daily.get(id);
 	if (raw?.length || hourly?.length || daily?.length) {
-		const newest = raw?.[raw.length - 1]?.t ?? 0;
 		out.bazaar = {
-			intraday: (raw ?? []).filter((p) => p.t >= newest - INTRADAY_WINDOW).map(bazaarTuple),
+			raw: (raw ?? []).map(bazaarTuple),
 			hourly: (hourly ?? []).map(bazaarTuple),
 			daily: (daily ?? []).map(bazaarTuple)
 		};
@@ -40,4 +41,23 @@ export function itemSeries(state: MarketState, id: string): ItemSeriesJson {
 	}
 
 	return out;
+}
+
+/** Merge disjoint tiers into one ascending series of [t, primary, secondary]. */
+export function mergedSeries(
+	json: ItemSeriesJson,
+	kind: 'bazaar' | 'auctions'
+): [number, number, number][] {
+	if (kind === 'bazaar') {
+		const tiers = json.bazaar;
+		if (!tiers) return [];
+		return [...tiers.daily, ...tiers.hourly, ...tiers.raw]
+			.map(([t, b, s]) => [t, b, s] as [number, number, number])
+			.sort((a, b) => a[0] - b[0]);
+	}
+	const tiers = json.auctions;
+	if (!tiers) return [];
+	return [...tiers.daily, ...tiers.raw]
+		.map(([t, l, m]) => [t, l, m] as [number, number, number])
+		.sort((a, b) => a[0] - b[0]);
 }

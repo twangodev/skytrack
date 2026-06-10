@@ -55,6 +55,8 @@
 
 	<PriceOverview
 		current={data.stats.lowestBin}
+		slug={data.slug}
+		kind="auctions"
 		primary={{ label: 'Lowest BIN', points: data.history.map((h) => [h.t, h.l]) }}
 		secondary={{ label: 'Median BIN', points: data.history.map((h) => [h.t, h.m]) }}
 	/>

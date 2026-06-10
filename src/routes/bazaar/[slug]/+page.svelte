@@ -87,6 +87,8 @@
 
 	<PriceOverview
 		current={snapshot.qs.bp}
+		slug={data.slug}
+		kind="bazaar"
 		primary={{ label: 'Instabuy', points: instabuy }}
 		secondary={{ label: 'Instasell', points: instasell }}
 	/>

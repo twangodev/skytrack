@@ -89,8 +89,12 @@ type AnyPoint = BazaarPoint | AuctionPoint;
 
 function seriesToProto(kind: KindName, id: string, points: AnyPoint[]): ItemSeries {
 	const ts = points.map((p) => BigInt(p.t));
-	const a = points.map((p) => toTenths(kind === 'bazaar' ? (p as BazaarPoint).b : (p as AuctionPoint).l));
-	const b = points.map((p) => toTenths(kind === 'bazaar' ? (p as BazaarPoint).s : (p as AuctionPoint).m));
+	const a = points.map((p) =>
+		toTenths(kind === 'bazaar' ? (p as BazaarPoint).b : (p as AuctionPoint).l)
+	);
+	const b = points.map((p) =>
+		toTenths(kind === 'bazaar' ? (p as BazaarPoint).s : (p as AuctionPoint).m)
+	);
 	return create(ItemSeriesSchema, {
 		id,
 		tsDelta: deltas(ts),
@@ -171,7 +175,9 @@ function bucketMedian<P extends AnyPoint>(
 		list.push(point);
 		buckets.set(start, list);
 	}
-	return [...buckets.entries()].sort(([x], [y]) => x - y).map(([start, list]) => reduce(list, start));
+	return [...buckets.entries()]
+		.sort(([x], [y]) => x - y)
+		.map(([start, list]) => reduce(list, start));
 }
 
 const round1 = (n: number) => Math.round(n * 10) / 10;

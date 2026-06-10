@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Area, Chart, Highlight, LinearGradient, Rule, Spline, Svg, Tooltip } from 'layerchart';
 	import { scaleTime } from 'd3-scale';
+	import { curveMonotoneX } from 'd3-shape';
 	import { browser } from '$app/environment';
 	import { formatPrice } from '$lib/format';
 	import type { Point } from '$lib/market/chart';
@@ -170,12 +171,17 @@
 				<Svg>
 					<Rule y={open} class="stroke-subtle [stroke-dasharray:2,4]" />
 					<LinearGradient stops={gradientStops} vertical let:gradient={fill}>
-						<Area y1={(d: Row) => d.primary} {fill} />
+						<Area y1={(d: Row) => d.primary} curve={curveMonotoneX} {fill} />
 					</LinearGradient>
-					<Spline y={(d: Row) => d.primary} class="fill-none stroke-[1.75] {stroke}" />
+					<Spline
+						y={(d: Row) => d.primary}
+						curve={curveMonotoneX}
+						class="fill-none stroke-[1.75] [stroke-linecap:round] [stroke-linejoin:round] {stroke}"
+					/>
 					{#if secondary}
 						<Spline
 							y={(d: Row) => d.secondary}
+							curve={curveMonotoneX}
 							defined={(d: Row) => d.secondary !== undefined}
 							class="fill-none stroke-muted/60 stroke-1 [stroke-dasharray:2,3]"
 						/>

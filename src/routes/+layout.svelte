@@ -1,5 +1,6 @@
 <script lang="ts">
 	import './layout.css';
+	import { dev } from '$app/environment';
 	import { ModeWatcher } from 'mode-watcher';
 	import { onNavigate } from '$app/navigation';
 	import { websiteSchema } from '$lib/schema';
@@ -22,6 +23,14 @@
 
 <ModeWatcher defaultMode="dark" disableHeadScriptInjection />
 <svelte:head>
+	{#if !dev}
+		<!-- same analytics property the previous site reported to -->
+		<script
+			defer
+			src="https://analytics.twango.dev/script.js"
+			data-website-id="e592eb98-f273-4d02-82c4-9b58c67532de"
+		></script>
+	{/if}
 	{@html `<script type="application/ld+json">${JSON.stringify(websiteSchema()).replace(/</g, '\\u003c')}${'</'}script>`}
 </svelte:head>
 

@@ -26,7 +26,9 @@
 	<meta property="og:title" content={fullTitle} />
 	<meta property="og:description" content={description} />
 	<meta property="og:type" content="website" />
+	<meta property="og:image" content="{site.url}/icon-512.png" />
 	<meta name="twitter:card" content="summary" />
+	<meta name="twitter:image" content="{site.url}/icon-512.png" />
 	{#each schemas as schema (schema)}
 		{@html `<script type="application/ld+json">${JSON.stringify(schema).replace(/</g, '\\u003c')}${'</'}script>`}
 	{/each}

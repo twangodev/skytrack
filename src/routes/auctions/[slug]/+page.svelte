@@ -2,6 +2,7 @@
 	import SEO from '$lib/components/SEO.svelte';
 	import LastUpdated from '$lib/components/LastUpdated.svelte';
 	import RarityBadge from '$lib/components/RarityBadge.svelte';
+	import StarButton from '$lib/components/StarButton.svelte';
 	import PriceOverview from '$lib/components/PriceOverview.svelte';
 	import { formatPrice, formatCompact } from '$lib/format';
 	import { breadcrumbSchema, itemPageSchema } from '$lib/schema';
@@ -47,6 +48,7 @@
 		<div class="mt-1 flex flex-wrap items-baseline gap-3">
 			<h1 class="text-2xl font-medium">{data.name}</h1>
 			<RarityBadge tier={data.tier} />
+			<StarButton kind="auctions" slug={data.slug} name={data.name} />
 		</div>
 		<p class="mt-1 text-sm text-muted">
 			<LastUpdated at={data.lastUpdated} />

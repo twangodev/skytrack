@@ -4,6 +4,7 @@
 	import OrderBookTable from '$lib/components/OrderBookTable.svelte';
 	import LastUpdated from '$lib/components/LastUpdated.svelte';
 	import RarityBadge from '$lib/components/RarityBadge.svelte';
+	import StarButton from '$lib/components/StarButton.svelte';
 	import DepthChart from '$lib/components/DepthChart.svelte';
 	import PriceOverview from '$lib/components/PriceOverview.svelte';
 	import { formatPrice } from '$lib/format';
@@ -79,6 +80,7 @@
 			{#if data.tier}
 				<RarityBadge tier={data.tier} />
 			{/if}
+			<StarButton kind="bazaar" slug={data.slug} name={data.name} />
 		</div>
 		<p class="mt-1 text-sm text-muted">
 			<LastUpdated at={updatedAt} live={isLive} />

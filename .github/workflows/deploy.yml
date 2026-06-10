@@ -1,67 +1,58 @@
-name: Deploy static content to Pages
+name: Build and Deploy
 
 on:
-  workflow_dispatch:
   push:
-    branches:
-      - main
+  workflow_dispatch:
   schedule:
-    - cron: '0 0 1 * *'
+    - cron: '0 */3 * * *'
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 concurrency:
-  group: "pages"
-  cancel-in-progress: false
+  group: ${{ github.workflow }}-${{ github.ref }}
 
 jobs:
-  generate-sitemap:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: '3'
-          cache: pip
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-      - name: Run sitemap_generator
-        run: python sitemap_generator.py
-      - name: Commit Changes
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "Auto-update from script"
-          branch: ${{ github.ref_name }}
-
-  deploy:
-    needs: generate-sitemap
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
-      - name: Setup Pages
-        uses: actions/configure-pages@v3
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/checkout@v6
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+      - name: Install Dependencies
+        run: bun install --frozen-lockfile
+      - name: Fetch Market Data
+        run: bun run fetch --force
+      - name: Commit Market History
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/history
+          git diff --cached --quiet || (git commit -m "chore(data): update market history" && git push)
+      - name: Test
+        run: bun run test
+      - name: Check
+        run: bun run check
+      - name: Build
+        run: bun run build
+      - name: Upload Pages Artifact
+        uses: actions/upload-pages-artifact@v5
         with:
-          # Upload entire repository
-          path: '.'
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          path: build
 
-  keepalive-job:
-    name: Keepalive Workflow
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
-      actions: write
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: gautamkrishnar/keepalive-workflow@v2
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

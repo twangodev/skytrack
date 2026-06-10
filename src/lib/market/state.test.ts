@@ -5,6 +5,7 @@ import {
 	appendSnapshot,
 	rollup,
 	validateGrowth,
+	stateStats,
 	emptyState,
 	totalPoints,
 	RAW_WINDOW,
@@ -128,21 +129,21 @@ describe('validateGrowth', () => {
 		const next = stateWithBazaarRaw({
 			A: Array.from({ length: 50 }, (_, i) => ({ t: 1000 + i, b: 1, s: 1 }))
 		});
-		expect(() => validateGrowth(prev, next)).toThrow(/shrank/);
+		expect(() => validateGrowth(stateStats(prev), next)).toThrow(/shrank/);
 	});
 
 	test('rejects timestamp regression', () => {
 		const next = stateWithBazaarRaw({
 			A: Array.from({ length: 100 }, (_, i) => ({ t: 500 + i, b: 1, s: 1 }))
 		});
-		expect(() => validateGrowth(prev, next)).toThrow(/regressed/);
+		expect(() => validateGrowth(stateStats(prev), next)).toThrow(/regressed/);
 	});
 
 	test('accepts grown state', () => {
 		const next = stateWithBazaarRaw({
 			A: Array.from({ length: 101 }, (_, i) => ({ t: 1000 + i, b: 1, s: 1 }))
 		});
-		expect(() => validateGrowth(prev, next)).not.toThrow();
+		expect(() => validateGrowth(stateStats(prev), next)).not.toThrow();
 	});
 
 	test('tolerates tiny shrink within 2%', () => {
@@ -150,7 +151,7 @@ describe('validateGrowth', () => {
 		const next = stateWithBazaarRaw({
 			A: Array.from({ length: 99 }, (_, i) => ({ t: 1001 + i, b: 1, s: 1 }))
 		});
-		expect(() => validateGrowth(prev, next)).not.toThrow();
+		expect(() => validateGrowth(stateStats(prev), next)).not.toThrow();
 	});
 
 	test('totalPoints counts across kinds and tiers', () => {

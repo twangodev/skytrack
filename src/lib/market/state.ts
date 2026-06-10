@@ -235,7 +235,7 @@ export function totalPoints(state: MarketState): number {
 	return total;
 }
 
-function latestTimestamp(state: MarketState): number {
+export function latestTimestamp(state: MarketState): number {
 	let latest = 0;
 	const scan = (tier: Map<string, AnyPoint[]>) => {
 		for (const points of tier.values()) {
@@ -251,19 +251,27 @@ function latestTimestamp(state: MarketState): number {
 	return latest;
 }
 
+export interface StateStats {
+	total: number;
+	latest: number;
+}
+
+/** Capture before mutating so validateGrowth needs no deep copy. */
+export function stateStats(state: MarketState): StateStats {
+	return { total: totalPoints(state), latest: latestTimestamp(state) };
+}
+
 /**
  * Guard against chain resets: the state we are about to publish must not be
  * meaningfully smaller or older than what the previous deploy carried.
  */
-export function validateGrowth(prev: MarketState, next: MarketState): void {
-	const prevTotal = totalPoints(prev);
+export function validateGrowth(prev: StateStats, next: MarketState): void {
 	const nextTotal = totalPoints(next);
-	if (nextTotal < prevTotal * 0.98) {
-		throw new Error(`state shrank: ${prevTotal} -> ${nextTotal} points`);
+	if (nextTotal < prev.total * 0.98) {
+		throw new Error(`state shrank: ${prev.total} -> ${nextTotal} points`);
 	}
-	const prevLatest = latestTimestamp(prev);
 	const nextLatest = latestTimestamp(next);
-	if (nextLatest < prevLatest) {
-		throw new Error(`latest timestamp regressed: ${prevLatest} -> ${nextLatest}`);
+	if (nextLatest < prev.latest) {
+		throw new Error(`latest timestamp regressed: ${prev.latest} -> ${nextLatest}`);
 	}
 }

@@ -5,3 +5,4 @@ src/lib/data/*.json
 .idea/
 .DS_Store
 vite.config.ts.timestamp-*
+static/data/

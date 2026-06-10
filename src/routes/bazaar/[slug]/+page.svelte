@@ -9,10 +9,23 @@
 	import { formatPrice } from '$lib/format';
 	import { breadcrumbSchema, itemPageSchema } from '$lib/schema';
 	import { site } from '$lib/config';
+	import { LiveBazaar } from '$lib/hypixel/live.svelte';
+	import { toSnapshot } from '$lib/market/aggregate';
 
 	const { data } = $props();
 
-	const snapshot = $derived(data.snapshot);
+	// recreated on navigation between product pages
+	let live = $state<LiveBazaar | null>(null);
+	$effect(() => {
+		const poller = new LiveBazaar(data.id);
+		poller.start();
+		live = poller;
+		return () => poller.stop();
+	});
+
+	const isLive = $derived(live !== null && live.product !== null && !live.failed);
+	const snapshot = $derived(live?.product ? toSnapshot(live.product) : data.snapshot);
+	const updatedAt = $derived(isLive ? (live?.lastUpdated ?? data.lastUpdated) : data.lastUpdated);
 
 	const description = $derived(
 		`${data.name} bazaar prices on Hypixel Skyblock: instabuy ${formatPrice(snapshot.qs.bp)} coins, ` +
@@ -51,7 +64,7 @@
 			{/if}
 		</div>
 		<p class="mt-1 text-sm text-muted">
-			<LastUpdated at={data.lastUpdated} />
+			<LastUpdated at={updatedAt} live={isLive} />
 		</p>
 	</div>
 

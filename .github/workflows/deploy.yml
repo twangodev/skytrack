@@ -37,12 +37,13 @@ jobs:
         if: github.event_name != 'schedule'
         run: bun run check
       # cron schedules are disabled after 60 days without repo activity;
-      # re-enable explicitly so a long Hypixel outage can't freeze the site
+      # re-enabling the workflow resets that timer (the keepalive-workflow
+      # action this replaces was blocked by github for tos reasons)
       - name: Keepalive
         if: github.event_name == 'schedule'
-        uses: gautamkrishnar/keepalive-workflow@v2
-        with:
-          use_api: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/deploy.yml/enable"
       - name: Build
         run: bun run build
       - name: Upload Pages Artifact

@@ -3,6 +3,7 @@ import { slugFromId } from '$lib/slug';
 import { titleCase } from '$lib/format';
 
 const BAZAAR_TAX = 0.0125;
+const TICK = 0.1; // outbid/undercut step the strategy assumes
 
 export function load() {
 	const { lastUpdated, products } = loadBazaar();
@@ -11,8 +12,10 @@ export function load() {
 		.filter(([, snap]) => snap.qs.bp > 0 && snap.qs.sp > 0)
 		.map(([id, snap]) => {
 			const { bp, sp, bmw, smw } = snap.qs;
-			const profit = bp * (1 - BAZAAR_TAX) - sp;
-			const marginPct = (profit / sp) * 100;
+			// buy order at instasell +0.1, sell offer at instabuy −0.1, tax on the sale
+			const buyCost = sp + TICK;
+			const profit = (bp - TICK) * (1 - BAZAAR_TAX) - buyCost;
+			const marginPct = (profit / buyCost) * 100;
 			const volume = Math.min(bmw, smw);
 			return {
 				id,

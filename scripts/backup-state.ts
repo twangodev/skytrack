@@ -43,7 +43,10 @@ interface Release {
 async function ensureRelease(): Promise<Release> {
 	try {
 		return await gh<Release>(`${API}/releases/tags/${TAG}`);
-	} catch {
+	} catch (error) {
+		// only a missing release warrants creating one — auth/rate-limit/5xx
+		// failures must surface, not cascade into a confusing create attempt
+		if (!String(error).includes('HTTP 404')) throw error;
 		console.log(`release ${TAG} not found; creating`);
 		return await gh<Release>(`${API}/releases`, {
 			method: 'POST',

@@ -39,12 +39,11 @@
 				<LastUpdated at={data.lastUpdated} />
 			</p>
 		</div>
-		<div class="flex gap-1 font-mono text-xs" role="tablist" aria-label="Change window">
+		<div class="flex gap-1 font-mono text-xs" role="group" aria-label="Change window">
 			{#each WINDOWS as w (w.key)}
 				<button
 					type="button"
-					role="tab"
-					aria-selected={range === w.key}
+					aria-pressed={range === w.key}
 					onclick={() => (range = w.key)}
 					class="cursor-pointer rounded-md px-2.5 py-1 transition-colors {range === w.key
 						? 'bg-surface font-semibold'

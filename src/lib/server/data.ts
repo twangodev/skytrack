@@ -63,9 +63,15 @@ const tail = <P extends { t: number }>(points: P[], windowSeconds: number): P[] 
 	return points.filter((p) => p.t >= newest - windowSeconds);
 };
 
+/** Full raw-tier series (15-min points, trailing ~30d) for windowed computations. */
+export function bazaarRaw(productId: string): BazaarHistoryPoint[] {
+	return loadTier<BazaarPoint>('bazaar-raw').get(productId) ?? [];
+}
+
 /**
  * SSR-embedded fallback series, capped so prerendered pages stay small:
- * all daily, last 7d hourly, last 24h raw. The client fetches the full
+ * all daily, the trailing 7d of the hourly tier (which holds 30–90d-old
+ * points), and the last 24h of raw. The client fetches the full
  * /data/items/{slug}.json for interactive ranges.
  */
 export function bazaarHistory(productId: string): BazaarHistoryPoint[] {

@@ -48,6 +48,9 @@
 		fetched = null;
 		if (!browser) return;
 		void loadSeries(target).then((data) => {
+			// don't memoize failures — a transient blip would otherwise stick
+			// until a full page reload
+			if (data === null) seriesCache.delete(target);
 			if (target === slug) fetched = data;
 		});
 	});
@@ -88,13 +91,17 @@
 	};
 
 	const selectedRangeSeconds = $derived((RANGES.find((r) => r.key === range) ?? RANGES[3]).seconds);
+	// a range with under two points can't show change — fall back to ALL, and
+	// keep the label, secondary series, and candle bucket consistent with that
+	const effectiveRangeSeconds = $derived(
+		clip(primaryPoints, selectedRangeSeconds).length >= 2 ? selectedRangeSeconds : Infinity
+	);
+	const widened = $derived(effectiveRangeSeconds !== selectedRangeSeconds);
+	const candleBucket = $derived(pickBucket(effectiveRangeSeconds));
 
-	const visible = $derived.by(() => {
-		const points = clip(primaryPoints, selectedRangeSeconds);
-		// a range with under two points can't show change — widen to everything
-		return points.length >= 2 ? points : primaryPoints;
-	});
-	const visibleSecondary = $derived(clip(secondaryPoints, selectedRangeSeconds));
+	const visible = $derived(clip(primaryPoints, effectiveRangeSeconds));
+	const visibleSecondary = $derived(clip(secondaryPoints, effectiveRangeSeconds));
+	const candles = $derived(style === 'candles' ? bucketOHLC(visible, candleBucket) : []);
 
 	const open = $derived(visible[0]?.[1] ?? current);
 	const change = $derived(current - open);
@@ -157,17 +164,17 @@
 		<p class="mt-1 font-mono text-sm tabular-nums {tone}">
 			{change >= 0 ? '+' : '−'}{formatPrice(Math.abs(change))}
 			({change >= 0 ? '+' : ''}{changePct.toFixed(2)}%)
-			<span class="font-sans text-muted">{rangeLabel[range]}</span>
+			<span class="font-sans text-muted">{widened ? 'all time' : rangeLabel[range]}</span>
 		</p>
 	</div>
 
-	{#if !enough}
+	{#if !enough || (style === 'candles' && candles.length < 2)}
 		<p class="rounded-md border border-subtle bg-surface px-4 py-10 text-center text-xs text-muted">
 			Not enough history yet — check back after a few updates.
 		</p>
 	{:else if style === 'candles'}
 		<div class="h-[220px] w-full">
-			<CandleChart candles={bucketOHLC(visible, pickBucket(selectedRangeSeconds))} />
+			<CandleChart {candles} bucketSeconds={candleBucket} />
 		</div>
 	{:else}
 		<div class="h-[220px] w-full font-mono text-[10px]">
@@ -226,12 +233,11 @@
 	{/if}
 
 	<div class="flex gap-1 font-mono text-xs">
-		<div class="flex gap-1" role="tablist" aria-label="Chart range">
+		<div class="flex gap-1" role="group" aria-label="Chart range">
 			{#each RANGES as r (r.key)}
 				<button
 					type="button"
-					role="tab"
-					aria-selected={range === r.key}
+					aria-pressed={range === r.key}
 					onclick={() => (range = r.key)}
 					class="cursor-pointer rounded-md px-2.5 py-1 transition-colors {range === r.key
 						? `${tone} bg-surface font-semibold`

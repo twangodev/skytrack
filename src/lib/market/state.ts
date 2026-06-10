@@ -62,7 +62,16 @@ const TIER_TO_PROTO: Record<TierName, Tier> = {
 	daily: Tier.DAILY
 };
 
-const toTenths = (n: number) => BigInt(Math.round(n * 10));
+const toTenths = (n: number) => {
+	const tenths = n * 10;
+	const rounded = Math.round(tenths);
+	// the wire format carries one decimal — refuse to silently mutate finer
+	// values between deploys (producers must round first)
+	if (Math.abs(tenths - rounded) / Math.max(1, Math.abs(tenths)) > 1e-9) {
+		throw new Error(`price ${n} has more than one decimal — round before encoding`);
+	}
+	return BigInt(rounded);
+};
 const fromTenths = (n: bigint) => Number(n) / 10;
 
 function deltas(values: bigint[]): bigint[] {
@@ -202,17 +211,21 @@ function spill<P extends AnyPoint>(
 	bucketSeconds: number,
 	reduce: (bucket: P[], start: number) => P
 ): void {
+	// Align the cutoff DOWN to a bucket boundary so a bucket only ever spills
+	// once it is complete. Spilling a bucket's points across several runs would
+	// recompute the "median" over a shrinking remainder and overwrite the
+	// earlier result — the aggregate would converge to the last sample.
+	const alignedCutoff = Math.floor(cutoff / bucketSeconds) * bucketSeconds;
 	for (const [id, points] of from) {
-		const stale = points.filter((p) => p.t < cutoff);
+		const stale = points.filter((p) => p.t < alignedCutoff);
 		if (stale.length === 0) continue;
 		from.set(
 			id,
-			points.filter((p) => p.t >= cutoff)
+			points.filter((p) => p.t >= alignedCutoff)
 		);
 		const rolled = bucketMedian(stale, bucketSeconds, reduce);
 		const existing = into.get(id) ?? [];
-		// rolled buckets always predate existing tail? not guaranteed across runs —
-		// merge by bucket start, last write wins, keep sorted
+		// merge by bucket start (idempotent on crash-resume), keep sorted
 		const merged = new Map<number, P>(existing.map((p) => [p.t, p]));
 		for (const p of rolled) merged.set(p.t, p);
 		into.set(

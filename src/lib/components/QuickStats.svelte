@@ -40,6 +40,11 @@
 			if (timer) clearTimeout(timer);
 			timer = setTimeout(() => (flashes = {}), 1200);
 		}
+		// no cleanup here: a re-run with no changes must not kill the pending
+		// reset, or the flash colors stick until the next price move
+	});
+
+	$effect(() => {
 		return () => {
 			if (timer) clearTimeout(timer);
 		};

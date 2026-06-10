@@ -114,8 +114,10 @@ async function restoreState(): Promise<MarketState> {
 			found.push({ name, kind, tier, bytes: new Uint8Array(readFileSync(localPath)) });
 			continue;
 		}
-		const url = `${SITE_DATA}/data/state/${name}.binpb`;
-		const res = await fetch(url).catch((error) => {
+		// cache-buster: the CDN may serve a minutes-stale copy, which would
+		// silently drop the previous run's snapshot from the chain
+		const url = `${SITE_DATA}/data/state/${name}.binpb?v=${Date.now()}`;
+		const res = await fetch(url, { headers: { 'Cache-Control': 'no-cache' } }).catch((error) => {
 			throw new Error(`state unreachable: ${url} (${error}) — refusing to reset the chain`);
 		});
 		if (res.ok) {
@@ -259,6 +261,27 @@ function cleanName(auction: RawAuction, id: string): string {
 	return auction.item_name;
 }
 
+/**
+ * When the AH crawl is skipped, the page-data snapshot comes from the
+ * previous deploy. Returns false when no snapshot can be found anywhere —
+ * the caller falls back to a full crawl.
+ */
+async function restoreAuctionsSnapshot(): Promise<boolean> {
+	const local = `${DATA_DIR}/auctions.json`;
+	const carried = `${STATE_DIR}/auctions-snapshot.json`;
+	if (existsSync(carried)) {
+		await Bun.write(local, Bun.file(carried));
+		return true;
+	}
+	if (existsSync(local)) return true; // previous local run's copy
+	const res = await fetch(`${SITE_DATA}/data/state/auctions-snapshot.json?v=${Date.now()}`, {
+		headers: { 'Cache-Control': 'no-cache' }
+	}).catch(() => null);
+	if (!res?.ok) return false;
+	await writeFile(local, new Uint8Array(await res.arrayBuffer()));
+	return true;
+}
+
 function auctionsAreStale(state: MarketState, now: number): boolean {
 	let newest = 0;
 	for (const points of state.auctions.raw.values()) {
@@ -277,6 +300,10 @@ async function emit(state: MarketState): Promise<void> {
 		await writeFile(`${STATE_DIR}/${name}.binpb`, encodeStateFile(kind, tier, source[tier]));
 	}
 
+	// the auctions snapshot is carried between deploys too, so runs that skip
+	// the AH crawl still have names/tiers for the prerendered pages
+	await Bun.write(`${STATE_DIR}/auctions-snapshot.json`, Bun.file(`${DATA_DIR}/auctions.json`));
+
 	const ids = new Set<string>([
 		...state.bazaar.raw.keys(),
 		...state.bazaar.hourly.keys(),
@@ -284,8 +311,18 @@ async function emit(state: MarketState): Promise<void> {
 		...state.auctions.raw.keys(),
 		...state.auctions.daily.keys()
 	]);
+	// per-kind slug maps may both be collision-free while two DIFFERENT ids
+	// still share one slug across kinds — that would silently overwrite a
+	// shared items/{slug}.json, so check the union here
+	const slugOwners = new Map<string, string>();
 	for (const id of ids) {
-		await writeFile(`${ITEMS_DIR}/${slugFromId(id)}.json`, JSON.stringify(itemSeries(state, id)));
+		const slug = slugFromId(id);
+		const owner = slugOwners.get(slug);
+		if (owner !== undefined && owner !== id) {
+			throw new Error(`cross-kind slug collision: ${owner} and ${id} both map to ${slug}`);
+		}
+		slugOwners.set(slug, id);
+		await writeFile(`${ITEMS_DIR}/${slug}.json`, JSON.stringify(itemSeries(state, id)));
 	}
 	console.log(`emitted ${STATE_FILES.length} state files, ${ids.size} item series`);
 }
@@ -305,10 +342,10 @@ async function main() {
 	const bazaarIds = await fetchBazaar(state);
 
 	let auctionIds: string[] = [];
-	if (auctionsAreStale(state, now) || !existsSync(`${DATA_DIR}/auctions.json`)) {
+	if (auctionsAreStale(state, now) || !(await restoreAuctionsSnapshot())) {
 		auctionIds = await fetchAuctions(state, items);
 	} else {
-		console.log('auctions fresh enough; carrying forward');
+		console.log('auctions fresh enough; carrying snapshot forward');
 	}
 
 	// fails loudly if two ids would collide on one slug; validated per kind
@@ -316,8 +353,11 @@ async function main() {
 	buildSlugMap(bazaarIds);
 	buildSlugMap([...auctionIds, ...state.auctions.raw.keys(), ...state.auctions.daily.keys()]);
 
-	rollup(state, now);
+	// validate BEFORE rollup: append can only grow the state, so any shrink
+	// here means a bad restore. Rollup legitimately shrinks point counts
+	// (N raw points fold into one bucket), so it must stay outside the gate.
 	validateGrowth(prev, state);
+	rollup(state, now);
 
 	await emit(state);
 	console.log(

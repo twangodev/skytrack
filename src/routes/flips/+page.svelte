@@ -82,13 +82,18 @@
 					{#each columns as column (column.key)}
 						<th
 							class="py-2 text-right font-normal {column.key === 'weeklyPotential' ? '' : 'pr-4'}"
+							aria-sort={sortKey === column.key
+								? sortDir === 'asc'
+									? 'ascending'
+									: 'descending'
+								: undefined}
 						>
 							<button
 								type="button"
 								onclick={() => sortBy(column.key)}
 								class="transition-colors {sortKey === column.key ? 'text-text' : 'text-muted'}"
 							>
-								{column.label}
+								{column.label}{sortKey === column.key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
 							</button>
 						</th>
 					{/each}

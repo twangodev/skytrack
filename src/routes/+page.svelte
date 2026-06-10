@@ -143,9 +143,13 @@
 			<div class="flex flex-col gap-0.5 bg-surface px-4 py-3">
 				<dt class="text-xs text-muted">Advancers / Decliners</dt>
 				<dd class="font-mono text-sm tabular-nums">
-					<span class="text-up">{data.breadth.up}</span>
-					/
-					<span class="text-down">{data.breadth.down}</span>
+					{#if data.breadth.up + data.breadth.down === 0}
+						<span class="text-muted">—</span>
+					{:else}
+						<span class="text-up">{data.breadth.up}</span>
+						/
+						<span class="text-down">{data.breadth.down}</span>
+					{/if}
 				</dd>
 			</div>
 			<div class="flex flex-col gap-0.5 bg-surface px-4 py-3">

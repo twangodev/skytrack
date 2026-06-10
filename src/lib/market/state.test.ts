@@ -104,6 +104,26 @@ describe('rollup', () => {
 		expect(state.bazaar.daily.get('A')).toEqual([{ t: dayBase, b: 20, s: 10 }]);
 	});
 
+	test('incremental runs preserve the bucket median (no last-sample overwrite)', () => {
+		// the same hour spilled across two consecutive runs must produce the
+		// same hourly median as spilling it all at once
+		const HOURLY_CUTOVER = RAW_WINDOW;
+		const base = Math.floor(1781000000 / HOUR) * HOUR;
+		const points = [
+			{ t: base + 300, b: 1, s: 0.5 },
+			{ t: base + 900, b: 9, s: 8 },
+			{ t: base + 1500, b: 2, s: 1 }
+		];
+		const incremental = stateWithBazaarRaw({ A: [...points] });
+		// run 1: cutoff lands mid-hour — nothing may spill yet
+		rollup(incremental, base + 900 + HOURLY_CUTOVER);
+		expect(incremental.bazaar.hourly.get('A') ?? []).toEqual([]);
+		expect(incremental.bazaar.raw.get('A')).toHaveLength(3);
+		// run 2: the hour is complete — all three points spill together
+		rollup(incremental, base + HOUR + HOURLY_CUTOVER);
+		expect(incremental.bazaar.hourly.get('A')).toEqual([{ t: base, b: 2, s: 1 }]);
+	});
+
 	test('auction raw rolls straight to daily with max count', () => {
 		const now = 1781000000;
 		const oldDay = now - RAW_WINDOW - 10 * DAY;

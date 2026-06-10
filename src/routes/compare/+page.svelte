@@ -8,7 +8,12 @@
 		if (!pending) {
 			pending = fetch(`/data/items/${slug}.json`)
 				.then((res) => (res.ok ? (res.json() as Promise<ItemSeriesJson>) : null))
-				.catch(() => null);
+				.catch(() => null)
+				.then((json) => {
+					// don't memoize failures — allow a retry on the next add
+					if (json === null) seriesCache.delete(slug);
+					return json;
+				});
 			seriesCache.set(slug, pending);
 		}
 		return pending;
@@ -21,6 +26,7 @@
 	import { scaleTime } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
 	import { browser } from '$app/environment';
+	import { replaceState } from '$app/navigation';
 	import SEO from '$lib/components/SEO.svelte';
 	import { mergedSeries } from '$lib/market/series';
 
@@ -121,7 +127,8 @@
 		const param = picked.map((p) => `${p.slug}:${p.kind}`).join(',');
 		if (param) url.searchParams.set('items', param);
 		else url.searchParams.delete('items');
-		history.replaceState(history.state, '', url);
+		// SvelteKit's replaceState keeps the router's bookkeeping intact
+		replaceState(url, {});
 	}
 
 	function addItem(item: SearchItem | Picked) {
@@ -416,12 +423,11 @@
 	{/if}
 
 	{#if picked.length > 0}
-		<div class="flex gap-1 font-mono text-xs" role="tablist" aria-label="Chart range">
+		<div class="flex gap-1 font-mono text-xs" role="group" aria-label="Chart range">
 			{#each RANGES as r (r.key)}
 				<button
 					type="button"
-					role="tab"
-					aria-selected={range === r.key}
+					aria-pressed={range === r.key}
 					onclick={() => (range = r.key)}
 					class="cursor-pointer rounded-md px-2.5 py-1 transition-colors {range === r.key
 						? 'bg-surface font-semibold text-text'

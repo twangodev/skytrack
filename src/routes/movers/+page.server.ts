@@ -1,4 +1,4 @@
-import { loadBazaar, loadItems, bazaarHistory } from '$lib/server/data';
+import { loadBazaar, loadItems, bazaarRaw } from '$lib/server/data';
 import { slugFromId } from '$lib/slug';
 import { titleCase } from '$lib/format';
 
@@ -20,7 +20,8 @@ export function load() {
 	const items = loadItems();
 	const now = Math.floor(Date.now() / 1000);
 
-	// Liquid products only; histories are reused across both windows.
+	// Liquid products only; the raw tier (15-min points, ~30d) covers both
+	// windows — the SSR-capped bazaarHistory would truncate 1W to 24h.
 	const candidates = Object.entries(products)
 		.filter(([, snap]) => snap.qs.bmw >= 100_000)
 		.map(([id, snap]) => ({
@@ -28,7 +29,7 @@ export function load() {
 			slug: slugFromId(id),
 			name: items[id]?.name ?? titleCase(id),
 			price: snap.qs.bp,
-			history: bazaarHistory(id)
+			history: bazaarRaw(id)
 		}));
 
 	const windows = Object.fromEntries(

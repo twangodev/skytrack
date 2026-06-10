@@ -13,7 +13,8 @@ export function load() {
 			bp: snap.qs.bp,
 			sp: snap.qs.sp,
 			bmw: snap.qs.bmw,
-			smw: snap.qs.smw
+			smw: snap.qs.smw,
+			demandShare: snap.qs.bv + snap.qs.sv === 0 ? 0 : snap.qs.sv / (snap.qs.bv + snap.qs.sv)
 		}))
 		.sort((a, b) => a.name.localeCompare(b.name));
 	return { lastUpdated, rows };

@@ -54,7 +54,8 @@
 					<th class="py-2 pr-4 text-right font-normal">Buy Price</th>
 					<th class="py-2 pr-4 text-right font-normal">Sell Price</th>
 					<th class="py-2 pr-4 text-right font-normal">Weekly Buys</th>
-					<th class="py-2 text-right font-normal">Weekly Sells</th>
+					<th class="py-2 pr-4 text-right font-normal">Weekly Sells</th>
+					<th class="py-2 text-right font-normal">Pressure</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -70,13 +71,22 @@
 						<td class="py-1.5 pr-4 text-right font-mono text-muted tabular-nums"
 							>{formatCompact(row.bmw)}</td
 						>
-						<td class="py-1.5 text-right font-mono text-muted tabular-nums"
+						<td class="py-1.5 pr-4 text-right font-mono text-muted tabular-nums"
 							>{formatCompact(row.smw)}</td
+						>
+						<td
+							class="py-1.5 text-right font-mono tabular-nums {row.demandShare > 0.55
+								? 'text-up'
+								: row.demandShare < 0.45
+									? 'text-down'
+									: 'text-muted'}"
+							title="share of order-book volume on the demand side"
+							>{Math.round(row.demandShare * 100) + '%'}</td
 						>
 					</tr>
 				{:else}
 					<tr
-						><td colspan="5" class="py-8 text-center text-muted">No products match “{query}”.</td
+						><td colspan="6" class="py-8 text-center text-muted">No products match “{query}”.</td
 						></tr
 					>
 				{/each}

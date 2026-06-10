@@ -1,0 +1,36 @@
+name: Backup History State
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Download live state
+        run: |
+          mkdir -p state
+          for f in bazaar-raw bazaar-hourly bazaar-daily auctions-raw auctions-daily; do
+            curl -fsSL "https://skytrack.twango.dev/data/state/$f.binpb" -o "state/$f.binpb"
+          done
+      - name: Upload to rolling release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          DATE=$(date -u +%F)
+          tar czf "state-$DATE.tar.gz" state
+          gh release view data-backup >/dev/null 2>&1 || \
+            gh release create data-backup --title "History backups" \
+              --notes "Rolling weekly backups of the deployment-carried market history. Restore: extract into static/data/state/ and run the pipeline with BOOTSTRAP=1." \
+              --latest=false
+          gh release upload data-backup "state-$DATE.tar.gz" --clobber
+          # prune to the newest 8 assets
+          gh release view data-backup --json assets -q '.assets[].name' | sort | head -n -8 | \
+            xargs -r -I{} gh release delete-asset data-backup {} -y

@@ -1,0 +1,7 @@
+.svelte-kit/
+build/
+node_modules/
+src/lib/data/
+data/history/
+bun.lock
+docs/

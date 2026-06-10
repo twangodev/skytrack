@@ -1,0 +1,41 @@
+{
+	"name": "skytrack",
+	"version": "2.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "vite dev",
+		"build": "vite build",
+		"preview": "vite preview",
+		"prepare": "svelte-kit sync || echo ''",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"format": "prettier --write .",
+		"lint": "prettier --check .",
+		"test": "vitest run",
+		"fetch": "bun scripts/fetch-data.ts",
+		"icons": "bun scripts/generate-icons.ts"
+	},
+	"devDependencies": {
+		"@lucide/svelte": "^0.575.0",
+		"@sveltejs/adapter-static": "^3.0.10",
+		"@sveltejs/kit": "^2.57.1",
+		"@sveltejs/vite-plugin-svelte": "^6.2.4",
+		"@tailwindcss/vite": "^4.2.2",
+		"@types/node": "^24",
+		"mode-watcher": "^1.1.0",
+		"png-to-ico": "^3.0.1",
+		"prettier": "^3.8.3",
+		"prettier-plugin-svelte": "^3.5.1",
+		"prettier-plugin-tailwindcss": "^0.7.2",
+		"prismarine-nbt": "^2.7.0",
+		"schema-dts": "^1.1.5",
+		"sharp": "^0.34.0",
+		"svelte": "^5.55.4",
+		"svelte-check": "^4.4.6",
+		"tailwindcss": "^4.2.2",
+		"typescript": "^5.9.3",
+		"vite": "^7.3.1",
+		"vitest": "^4.1.8",
+		"zod": "^4.4.3"
+	}
+}

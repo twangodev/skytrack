@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://skytrack.twango.dev/sitemap.xml
+
+# LLM-friendly content
+# https://skytrack.twango.dev/llms.txt
+# https://skytrack.twango.dev/llms-full.txt

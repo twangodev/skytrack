@@ -27,6 +27,12 @@ describe('aggregateBins', () => {
 		expect(out.A.lowestBin).toBe(2);
 		expect(out.A.medianBin).toBe(2);
 	});
+
+	test('name selection is order-independent', () => {
+		const a = { id: 'A', price: 1, tier: 'RARE', name: 'Zeta Rune' };
+		const b = { id: 'A', price: 2, tier: 'RARE', name: 'Alpha Rune' };
+		expect(aggregateBins([a, b]).A.name).toBe(aggregateBins([b, a]).A.name);
+	});
 });
 
 describe('toSnapshot', () => {

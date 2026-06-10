@@ -1,6 +1,14 @@
 <script lang="ts">
 	import type { Level } from '$lib/market/aggregate';
-	import { cumulative, depthDomain, scale, stepPath, type Point } from '$lib/market/chart';
+	import {
+		cumulative,
+		depthDomain,
+		logDepth,
+		logPoints,
+		scale,
+		stepPath,
+		type Point
+	} from '$lib/market/chart';
 	import { formatCompact, formatPrice } from '$lib/format';
 
 	interface Props {
@@ -22,10 +30,8 @@
 	const xd = $derived(depthDomain(buy, sell));
 	// log depth: bid and ask books are often orders of magnitude apart, and a
 	// linear scale flattens the thin side into invisibility
-	const logDepth = (y: number) => Math.log10(1 + y);
 	const maxDepth = $derived(Math.max(1, ...asks.map(([, y]) => y), ...bids.map(([, y]) => y)));
 	const yd = $derived([0, logDepth(maxDepth) * 1.05] as [number, number]);
-	const logPoints = (points: Point[]): Point[] => points.map(([x, y]) => [x, logDepth(y)]);
 
 	const mid = $derived(
 		buy.length && sell.length ? (buy[0][0] + sell[0][0]) / 2 : (buy[0]?.[0] ?? sell[0]?.[0] ?? 0)

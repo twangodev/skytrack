@@ -32,8 +32,10 @@ export function aggregateBins(bins: DecodedBin[]): Record<string, AuctionItemSta
 	const out: Record<string, AuctionItemStats> = {};
 	for (const [id, list] of grouped) {
 		const prices = list.map((b) => b.price);
+		// pick names deterministically — pagination order shifts between fetches
+		const name = list.map((b) => b.name).sort()[0];
 		out[id] = {
-			name: list[0].name,
+			name,
 			tier: list[0].tier,
 			lowestBin: Math.round(Math.min(...prices)),
 			medianBin: Math.round(median(prices)),

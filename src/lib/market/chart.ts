@@ -63,8 +63,18 @@ export function niceTicks(min: number, max: number, count = 4): number[] {
 	const magnitude = 10 ** Math.floor(Math.log10(step));
 	const nice = [1, 2, 2.5, 5, 10].find((m) => m * magnitude >= step) ?? 10;
 	const niceStep = nice * magnitude;
+	// round to the step's own precision, not a fixed 2 decimals — fixed
+	// rounding collapses neighboring ticks into duplicates on small domains
+	const decimals = Math.max(0, -Math.floor(Math.log10(niceStep)) + 1);
 	const start = Math.ceil(min / niceStep) * niceStep;
 	const ticks: number[] = [];
-	for (let v = start; v <= max + 1e-9; v += niceStep) ticks.push(fmt(v));
-	return ticks;
+	for (let v = start; v <= max + niceStep * 1e-6; v += niceStep) {
+		ticks.push(Number(v.toFixed(decimals)));
+	}
+	return [...new Set(ticks)];
 }
+
+/** Compress depth so a thin book stays visible next to a deep one. */
+export const logDepth = (y: number) => Math.log10(1 + y);
+
+export const logPoints = (points: Point[]): Point[] => points.map(([x, y]) => [x, logDepth(y)]);

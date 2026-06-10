@@ -91,4 +91,27 @@ describe('niceTicks', () => {
 			expect(t).toBeLessThanOrEqual(1234);
 		}
 	});
+
+	test('no duplicate ticks on sub-cent domains', () => {
+		const ticks = niceTicks(0.092, 0.108, 4);
+		expect(new Set(ticks).size).toBe(ticks.length);
+		expect(ticks.length).toBeGreaterThanOrEqual(2);
+	});
+
+	test('no duplicates on tiny domains', () => {
+		const ticks = niceTicks(0.001, 0.0015, 4);
+		expect(new Set(ticks).size).toBe(ticks.length);
+	});
+});
+
+describe('logDepth', () => {
+	test('zero maps to zero', async () => {
+		const { logDepth } = await import('./chart');
+		expect(logDepth(0)).toBe(0);
+		expect(logDepth(9)).toBe(1);
+	});
+	test('logPoints transforms y only', async () => {
+		const { logPoints } = await import('./chart');
+		expect(logPoints([[5, 99]])).toEqual([[5, 2]]);
+	});
 });

@@ -2,7 +2,7 @@
 // (src/lib/data/*.json) and appends committed history (data/history/**).
 // Orchestration only — the logic lives in src/lib and is tested there.
 import { mkdir, readdir, readFile, writeFile, appendFile, rm } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import type { ZodType } from 'zod';
 import {
 	bazaarResponse,
@@ -30,8 +30,6 @@ const HISTORY_DIR = 'data/history';
 const FRESH_MS = 10 * 60 * 1000;
 const force = process.argv.includes('--force');
 
-const round1 = (n: number) => Math.round(n * 10) / 10;
-
 async function fetchJson<T>(url: string, schema: ZodType<T>, retries = 3): Promise<T> {
 	let lastError: unknown;
 	for (let attempt = 0; attempt <= retries; attempt++) {
@@ -49,10 +47,12 @@ async function fetchJson<T>(url: string, schema: ZodType<T>, retries = 3): Promi
 }
 
 function isFresh(): boolean {
-	const path = `${DATA_DIR}/bazaar.json`;
-	if (!existsSync(path)) return false;
+	// all three artifacts must exist — a run that died mid-way must not look fresh
+	for (const name of ['items.json', 'auctions.json', 'bazaar.json']) {
+		if (!existsSync(`${DATA_DIR}/${name}`)) return false;
+	}
 	try {
-		const { lastUpdated } = JSON.parse(require('node:fs').readFileSync(path, 'utf8'));
+		const { lastUpdated } = JSON.parse(readFileSync(`${DATA_DIR}/bazaar.json`, 'utf8'));
 		return Date.now() - lastUpdated < FRESH_MS;
 	} catch {
 		return false;
@@ -69,12 +69,16 @@ async function compactHistory(kind: 'bazaar' | 'auctions', today: string) {
 	const dir = `${HISTORY_DIR}/${kind}`;
 	if (!existsSync(dir)) return;
 	const stale = selectStale(await readdir(dir), today);
+	if (stale.length === 0) return;
+	const dailyPath = `${dir}/daily.ndjson`;
+	const compactedDates = new Set(
+		existsSync(dailyPath)
+			? decodeNdjson<{ d: string }>(await readFile(dailyPath, 'utf8')).map((row) => row.d)
+			: []
+	);
 	for (const name of stale) {
 		const date = name.slice(0, 10);
-		const dailyPath = `${dir}/daily.ndjson`;
-		const existingDaily = existsSync(dailyPath) ? await readFile(dailyPath, 'utf8') : '';
-		const alreadyCompacted = existingDaily.includes(`"d":"${date}"`);
-		if (!alreadyCompacted) {
+		if (!compactedDates.has(date)) {
 			const rows = decodeNdjson<never>(await readFile(`${dir}/${name}`, 'utf8'));
 			const compacted =
 				kind === 'bazaar'
@@ -117,7 +121,7 @@ async function fetchBazaar(): Promise<string[]> {
 	const t = Math.floor(data.lastUpdated / 1000);
 	const rows: BazaarRow[] = Object.entries(products)
 		.filter(([, snap]) => snap.qs.bp !== 0 || snap.qs.sp !== 0)
-		.map(([p, snap]) => ({ t, p, b: round1(snap.qs.bp), s: round1(snap.qs.sp) }));
+		.map(([p, snap]) => ({ t, p, b: snap.qs.bp, s: snap.qs.sp }));
 	await appendHistory('bazaar', dayKey(t), rows);
 	console.log(`bazaar: ${rows.length} products`);
 	return Object.keys(products);
@@ -136,7 +140,10 @@ async function fetchAuctions(items: Record<string, { name: string }>): Promise<s
 			))
 		);
 	}
-	const auctions = pages.flatMap((p) => p.auctions);
+	// listings shift pages while we crawl — dedup by uuid so none count twice
+	const auctions = [
+		...new Map(pages.flatMap((p) => p.auctions).map((a) => [a.uuid, a])).values()
+	];
 	const bins = auctions.filter((a) => a.bin === true && a.claimed !== true);
 
 	const decoded: DecodedBin[] = [];
@@ -185,6 +192,10 @@ function cleanName(auction: RawAuction, id: string): string {
 	if (id.startsWith('PET_')) {
 		return auction.item_name.replace(/^\[Lvl \d+\] /, '') + ' Pet';
 	}
+	if (id.startsWith('RUNE_')) {
+		// "◆ Music Rune III" -> "Music Rune"
+		return auction.item_name.replace(/^◆ /, '').replace(/ [IVXLC]+$/, '');
+	}
 	return auction.item_name;
 }
 
@@ -199,8 +210,10 @@ async function main() {
 	const bazaarIds = await fetchBazaar();
 	const auctionIds = await fetchAuctions(items);
 
-	// fails loudly if two ids would collide on one slug
-	buildSlugMap([...bazaarIds, ...auctionIds]);
+	// fails loudly if two ids would collide on one slug; validated per kind
+	// because routes are namespaced (/bazaar/x and /auctions/x can coexist)
+	buildSlugMap(bazaarIds);
+	buildSlugMap(auctionIds);
 
 	const today = dayKey(Math.floor(Date.now() / 1000));
 	await compactHistory('bazaar', today);

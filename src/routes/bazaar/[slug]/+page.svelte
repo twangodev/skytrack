@@ -25,7 +25,9 @@
 
 	const isLive = $derived(live !== null && live.product !== null && !live.failed);
 	const snapshot = $derived(live?.product ? toSnapshot(live.product) : data.snapshot);
-	const updatedAt = $derived(isLive ? (live?.lastUpdated ?? data.lastUpdated) : data.lastUpdated);
+	// timestamp must describe whatever snapshot is on screen, even if the
+	// latest poll failed and we're still showing the previous successful one
+	const updatedAt = $derived(live?.product ? (live.lastUpdated ?? data.lastUpdated) : data.lastUpdated);
 
 	const description = $derived(
 		`${data.name} bazaar prices on Hypixel Skyblock: instabuy ${formatPrice(snapshot.qs.bp)} coins, ` +

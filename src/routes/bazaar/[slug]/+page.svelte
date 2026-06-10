@@ -4,6 +4,8 @@
 	import OrderBookTable from '$lib/components/OrderBookTable.svelte';
 	import LastUpdated from '$lib/components/LastUpdated.svelte';
 	import RarityBadge from '$lib/components/RarityBadge.svelte';
+	import DepthChart from '$lib/components/DepthChart.svelte';
+	import HistoryChart from '$lib/components/HistoryChart.svelte';
 	import { formatPrice } from '$lib/format';
 	import { breadcrumbSchema, itemPageSchema } from '$lib/schema';
 	import { site } from '$lib/config';
@@ -55,8 +57,28 @@
 
 	<QuickStats qs={snapshot.qs} />
 
+	<DepthChart buy={snapshot.buy} sell={snapshot.sell} />
+
 	<div class="grid gap-8 sm:grid-cols-2">
 		<OrderBookTable levels={snapshot.buy} side="buy" />
 		<OrderBookTable levels={snapshot.sell} side="sell" />
 	</div>
+
+	<HistoryChart
+		title="Price History"
+		lines={[
+			{
+				label: 'Instabuy',
+				points: data.history.map((h) => [h.t, h.b]),
+				colorClass: 'stroke-down',
+				textClass: 'text-down'
+			},
+			{
+				label: 'Instasell',
+				points: data.history.map((h) => [h.t, h.s]),
+				colorClass: 'stroke-up',
+				textClass: 'text-up'
+			}
+		]}
+	/>
 </article>

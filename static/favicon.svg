@@ -1,13 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <style>
-    rect { fill: #1a1916; }
-    path { stroke: #e8e5df; }
+    .bg { fill: #1a1916; }
+    .fg { fill: #e8e5df; }
     @media (prefers-color-scheme: light) {
-      rect { fill: #f8f6f1; }
-      path { stroke: #1a1916; }
+      .bg { fill: #f8f6f1; }
+      .fg { fill: #1a1916; }
     }
   </style>
-  <rect width="32" height="32" rx="6"/>
-  <path d="M7 23 L13 16.5 L17 20 L24.5 11" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M19.5 10 H25 V15.5" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect class="bg" width="32" height="32" rx="6"/>
+  <g class="fg" transform="translate(16 16) scale(0.82) translate(-16 -16)">
+    <path d="M4 28 V23 H10 V17 H16 V11 H22 V28 Z"/>
+    <rect x="24" y="4" width="5" height="5"/>
+  </g>
 </svg>

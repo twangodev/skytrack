@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { TrendingUp } from '@lucide/svelte';
 	import { site } from '$lib/config';
+	import Logo from './Logo.svelte';
 	import ThemeToggle from './ThemeToggle.svelte';
 </script>
 
@@ -9,7 +9,7 @@
 		href="/"
 		class="flex items-center gap-1.5 text-sm tracking-wide transition-colors hover:text-accent"
 	>
-		<TrendingUp size={14} strokeWidth={2} aria-hidden="true" />
+		<Logo size={15} />
 		{site.title}
 	</a>
 	<nav class="flex items-center gap-4 text-sm text-muted">

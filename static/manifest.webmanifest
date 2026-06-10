@@ -1,0 +1,14 @@
+{
+	"name": "SkyTrack",
+	"short_name": "SkyTrack",
+	"description": "Live Hypixel Skyblock market tracker — bazaar order books and auction house BIN prices.",
+	"start_url": "/",
+	"display": "standalone",
+	"background_color": "#1a1916",
+	"theme_color": "#1a1916",
+	"icons": [
+		{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+		{ "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+		{ "src": "/icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+	]
+}

@@ -15,7 +15,7 @@ ${site.description}
 
 ## About
 
-SkyTrack tracks the Hypixel Skyblock in-game economy using only the official Hypixel API:
+Skytrack tracks the Hypixel Skyblock in-game economy using only the official Hypixel API:
 
 - **Bazaar** (${bazaarCount} products): live order books with instabuy/instasell prices, market depth, volume, and order counts. Pages poll the official API in the browser, so displayed prices are real-time.
 - **Auction House** (${auctionCount} items): lowest and median buy-it-now (BIN) prices aggregated from every active BIN listing, refreshed roughly every 3 hours. Bazaar pages refresh every 15 minutes, with price history served per item at ${site.url}/data/items/{slug}.json.

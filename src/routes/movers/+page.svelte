@@ -26,7 +26,7 @@
 	description="Biggest gainers and losers on the Hypixel Skyblock bazaar over the past day and week — liquid products ranked by price change."
 	canonical="/movers"
 	jsonLd={breadcrumbSchema([
-		{ name: 'SkyTrack', url: site.url },
+		{ name: site.title, url: site.url },
 		{ name: 'Top Movers', url: `${site.url}/movers` }
 	])}
 />

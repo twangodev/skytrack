@@ -50,7 +50,7 @@
 	description={`Flipping margins and spreads for ${data.rows.length} profitable Hypixel Skyblock bazaar products — buy-order to sell-offer profit, margin, and weekly volume.`}
 	canonical="/flips"
 	jsonLd={breadcrumbSchema([
-		{ name: 'SkyTrack', url: site.url },
+		{ name: site.title, url: site.url },
 		{ name: 'Flips', url: `${site.url}/flips` }
 	])}
 />

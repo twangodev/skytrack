@@ -1,4 +1,4 @@
-# SkyTrack
+# Skytrack
 
 Live [Hypixel Skyblock](https://hypixel.net) market tracker — real-time bazaar order books and
 auction house BIN prices for every item, at [skytrack.twango.dev](https://skytrack.twango.dev).

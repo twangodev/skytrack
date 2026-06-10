@@ -62,7 +62,7 @@
 			description
 		}),
 		breadcrumbSchema([
-			{ name: 'SkyTrack', url: site.url },
+			{ name: site.title, url: site.url },
 			{ name: 'Bazaar', url: `${site.url}/bazaar` },
 			{ name: data.name, url: `${site.url}/bazaar/${data.slug}` }
 		])

@@ -3,7 +3,7 @@
 		size?: number;
 	}
 
-	// the SkyTrack mark — Minecraft stairs as a rising chart, with the next
+	// the Skytrack mark — Minecraft stairs as a rising chart, with the next
 	// step floating above. Keep in sync with static/favicon.svg and
 	// scripts/generate-icons.ts. Drawn in currentColor.
 	const { size = 16 }: Props = $props();

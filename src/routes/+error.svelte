@@ -9,5 +9,5 @@
 			? "This item isn't tracked here."
 			: (page.error?.message ?? 'Something went wrong.')}
 	</p>
-	<a href="/" class="text-sm text-accent transition-colors hover:underline">Back to SkyTrack</a>
+	<a href="/" class="text-sm text-accent transition-colors hover:underline">Back to Skytrack</a>
 </div>

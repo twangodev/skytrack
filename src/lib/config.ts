@@ -1,5 +1,5 @@
 export const site = {
-	title: 'SkyTrack',
+	title: 'Skytrack',
 	url: 'https://skytrack.twango.dev',
 	description:
 		'Live Hypixel Skyblock market tracker — real-time bazaar order books and auction house BIN prices for every item.',

@@ -1,6 +1,6 @@
 {
-	"name": "SkyTrack",
-	"short_name": "SkyTrack",
+	"name": "Skytrack",
+	"short_name": "Skytrack",
 	"description": "Live Hypixel Skyblock market tracker — bazaar order books and auction house BIN prices.",
 	"start_url": "/",
 	"display": "standalone",

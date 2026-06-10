@@ -17,7 +17,7 @@
 </script>
 
 <svelte:head>
-	<title>SkyTrack</title>
+	<title>Skytrack</title>
 	<meta name="robots" content="noindex" />
 </svelte:head>
 

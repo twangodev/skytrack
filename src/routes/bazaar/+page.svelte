@@ -22,7 +22,7 @@
 	description={`Live buy and sell prices for all ${data.rows.length} Hypixel Skyblock bazaar products — order books, market depth, and trade volume.`}
 	canonical="/bazaar"
 	jsonLd={breadcrumbSchema([
-		{ name: 'SkyTrack', url: site.url },
+		{ name: site.title, url: site.url },
 		{ name: 'Bazaar', url: `${site.url}/bazaar` }
 	])}
 />

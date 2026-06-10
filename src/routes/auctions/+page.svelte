@@ -23,7 +23,7 @@
 	description={`Lowest and median BIN prices for ${data.rows.length} Hypixel Skyblock auction house items, aggregated from every active buy-it-now listing.`}
 	canonical="/auctions"
 	jsonLd={breadcrumbSchema([
-		{ name: 'SkyTrack', url: site.url },
+		{ name: site.title, url: site.url },
 		{ name: 'Auctions', url: `${site.url}/auctions` }
 	])}
 />

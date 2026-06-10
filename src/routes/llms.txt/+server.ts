@@ -36,7 +36,7 @@ ${site.url}/llms-full.txt
 
 ## Source
 
-${site.repo} — data from the official Hypixel API (https://api.hypixel.net). Not affiliated with Hypixel Inc.
+Source: ${site.repo}. Data from the official Hypixel API (https://api.hypixel.net). Not affiliated with Hypixel Inc.
 `;
 
 	return new Response(body, {

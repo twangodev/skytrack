@@ -3,6 +3,7 @@
 	import SEO from '$lib/components/SEO.svelte';
 	import ItemSearch from '$lib/components/ItemSearch.svelte';
 	import LastUpdated from '$lib/components/LastUpdated.svelte';
+	import Sparkline from '$lib/components/Sparkline.svelte';
 	import WatchlistSection from '$lib/components/WatchlistSection.svelte';
 	import { formatCompact, formatPrice } from '$lib/format';
 	import { site } from '$lib/config';
@@ -15,25 +16,6 @@
 	const indexChange = $derived(
 		data.index.length >= 2 ? data.index[data.index.length - 1][1] : null
 	);
-
-	const sparkPoints = $derived.by(() => {
-		if (data.index.length < 2) return '';
-		const ts = data.index.map(([t]) => t);
-		const vs = data.index.map(([, v]) => v);
-		const tMin = Math.min(...ts);
-		const tSpan = Math.max(...ts) - tMin || 1;
-		const vMin = Math.min(...vs);
-		const vMax = Math.max(...vs);
-		const pad = (vMax - vMin) * 0.1 || 1;
-		const lo = vMin - pad;
-		const span = vMax + pad - lo;
-		return data.index
-			.map(
-				([t, v]) =>
-					`${(((t - tMin) / tSpan) * 600).toFixed(1)},${((1 - (v - lo) / span) * 40).toFixed(1)}`
-			)
-			.join(' ');
-	});
 </script>
 
 <SEO canonical="/" />
@@ -168,14 +150,9 @@
 			</div>
 		</dl>
 		{#if data.index.length >= 2}
-			<svg
-				viewBox="0 0 600 40"
-				preserveAspectRatio="none"
-				class="h-10 w-full {(indexChange ?? 0) >= 0 ? 'text-up' : 'text-down'}"
-				aria-hidden="true"
-			>
-				<polyline points={sparkPoints} fill="none" stroke="currentColor" stroke-width="1.5" />
-			</svg>
+			<div class="h-10 w-full {(indexChange ?? 0) >= 0 ? 'text-up' : 'text-down'}">
+				<Sparkline points={data.index} />
+			</div>
 		{/if}
 	</section>
 
@@ -201,6 +178,9 @@
 							>
 								{pct(mover.change)}
 							</span>
+						</span>
+						<span class="h-8 {mover.change >= 0 ? 'text-up' : 'text-down'}">
+							<Sparkline points={mover.spark} />
 						</span>
 					</a>
 				{/each}

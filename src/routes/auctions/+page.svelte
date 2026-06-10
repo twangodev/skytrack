@@ -79,7 +79,7 @@
 							class="py-1.5 text-right font-mono tabular-nums {row.discount >= 0.2
 								? 'text-up'
 								: 'text-muted'}"
-							title="lowest BIN vs median BIN — large gaps suggest underpriced listings"
+							title="lowest BIN vs median BIN; large gaps suggest underpriced listings"
 							>{(row.discount * 100).toFixed(0) + '%'}</td
 						>
 					</tr>

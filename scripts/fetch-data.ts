@@ -1,6 +1,6 @@
 // Deployment-carried state pipeline: restore the previous deploy's packed
 // history, append fresh official-API data, re-tier, and emit state +
-// per-item JSON endpoints into static/data/. Orchestration only — the
+// per-item JSON endpoints into static/data/. Orchestration only - the
 // logic lives in src/lib and is tested there.
 import { mkdir, writeFile } from 'node:fs/promises';
 import { existsSync, readFileSync } from 'node:fs';
@@ -81,7 +81,7 @@ async function assertFirstDeploy(): Promise<void> {
 	const probe = await fetch(`${SITE_DATA}/`).catch(() => null);
 	if (!probe?.ok) {
 		throw new Error(
-			`site unreachable (${SITE_DATA}); cannot tell a first deploy from an outage — refusing to reset the chain`
+			`site unreachable (${SITE_DATA}); cannot tell a first deploy from an outage - refusing to reset the chain`
 		);
 	}
 	const token = process.env.GH_TOKEN;
@@ -94,14 +94,14 @@ async function assertFirstDeploy(): Promise<void> {
 			const release = (await res.json()) as { assets?: unknown[] };
 			if (release.assets?.length) {
 				throw new Error(
-					'state routes 404 but data-backup release has assets — history existed; restore it into static/data/state/ instead of bootstrapping'
+					'state routes 404 but data-backup release has assets - history existed; restore it into static/data/state/ instead of bootstrapping'
 				);
 			}
 		}
 	} else {
 		console.warn('no GH_TOKEN; skipping backup-release check before bootstrap');
 	}
-	console.warn('auto-bootstrap: site is live but has never published state — starting empty');
+	console.warn('auto-bootstrap: site is live but has never published state - starting empty');
 }
 
 /** Previous deploy's state: local files win (repeat local runs), else the live site. */
@@ -118,7 +118,7 @@ async function restoreState(): Promise<MarketState> {
 		// silently drop the previous run's snapshot from the chain
 		const url = `${SITE_DATA}/data/state/${name}.binpb?v=${Date.now()}`;
 		const res = await fetch(url, { headers: { 'Cache-Control': 'no-cache' } }).catch((error) => {
-			throw new Error(`state unreachable: ${url} (${error}) — refusing to reset the chain`);
+			throw new Error(`state unreachable: ${url} (${error}) - refusing to reset the chain`);
 		});
 		if (res.ok) {
 			found.push({ name, kind, tier, bytes: new Uint8Array(await res.arrayBuffer()) });
@@ -126,7 +126,7 @@ async function restoreState(): Promise<MarketState> {
 			missing.push(name);
 		} else {
 			throw new Error(
-				`state fetch failed: ${url} -> HTTP ${res.status} — refusing to reset the chain`
+				`state fetch failed: ${url} -> HTTP ${res.status} - refusing to reset the chain`
 			);
 		}
 	}
@@ -135,7 +135,7 @@ async function restoreState(): Promise<MarketState> {
 		await assertFirstDeploy();
 	} else if (missing.length > 0 && !bootstrap) {
 		throw new Error(
-			`partial state: missing ${missing.join(', ')} while others exist — refusing to proceed (set BOOTSTRAP=1 to override)`
+			`partial state: missing ${missing.join(', ')} while others exist - refusing to proceed (set BOOTSTRAP=1 to override)`
 		);
 	}
 
@@ -207,7 +207,7 @@ async function fetchAuctions(
 			))
 		);
 	}
-	// listings shift pages while we crawl — dedup by uuid so none count twice
+	// listings shift pages while we crawl - dedup by uuid so none count twice
 	const auctions = [...new Map(pages.flatMap((p) => p.auctions).map((a) => [a.uuid, a])).values()];
 	const bins = auctions.filter((a) => a.bin === true && a.claimed !== true);
 
@@ -263,7 +263,7 @@ function cleanName(auction: RawAuction, id: string): string {
 
 /**
  * When the AH crawl is skipped, the page-data snapshot comes from the
- * previous deploy. Returns false when no snapshot can be found anywhere —
+ * previous deploy. Returns false when no snapshot can be found anywhere;
  * the caller falls back to a full crawl.
  */
 async function restoreAuctionsSnapshot(): Promise<boolean> {
@@ -312,7 +312,7 @@ async function emit(state: MarketState): Promise<void> {
 		...state.auctions.daily.keys()
 	]);
 	// per-kind slug maps may both be collision-free while two DIFFERENT ids
-	// still share one slug across kinds — that would silently overwrite a
+	// still share one slug across kinds - that would silently overwrite a
 	// shared items/{slug}.json, so check the union here
 	const slugOwners = new Map<string, string>();
 	for (const id of ids) {

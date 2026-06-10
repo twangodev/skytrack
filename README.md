@@ -1,6 +1,6 @@
 # skytrack
 
-Live Hypixel Skyblock market tracker — [skytrack.twango.dev](https://skytrack.twango.dev)
+Live Hypixel Skyblock market tracker: [skytrack.twango.dev](https://skytrack.twango.dev)
 
 ```sh
 bun install

@@ -8,6 +8,14 @@ interface Row {
 	name: string;
 	price: number;
 	change: number;
+	spark: [number, number][];
+}
+
+/** thin the spark payload; ~24 points is plenty at sparkline size */
+function downsample(points: [number, number][], target = 24): [number, number][] {
+	if (points.length <= target) return points;
+	const step = (points.length - 1) / (target - 1);
+	return Array.from({ length: target }, (_, i) => points[Math.round(i * step)]);
 }
 
 const WINDOWS = [
@@ -21,7 +29,7 @@ export function load() {
 	const now = Math.floor(Date.now() / 1000);
 
 	// Liquid products only; the raw tier (15-min points, ~30d) covers both
-	// windows — the SSR-capped bazaarHistory would truncate 1W to 24h.
+	// windows - the SSR-capped bazaarHistory would truncate 1W to 24h.
 	const candidates = Object.entries(products)
 		.filter(([, snap]) => snap.qs.bmw >= 100_000)
 		.map(([id, snap]) => ({
@@ -41,7 +49,11 @@ export function load() {
 					const first = points[0].b;
 					const last = points[points.length - 1].b;
 					if (first <= 0) return null;
-					return { ...row, change: (last - first) / first };
+					return {
+						...row,
+						change: (last - first) / first,
+						spark: downsample(points.map((h) => [h.t, h.b] as [number, number]))
+					};
 				})
 				.filter((r) => r !== null)
 				.sort((a, b) => b.change - a.change);

@@ -1,6 +1,6 @@
 <script lang="ts">
+	import NumberFlow from '@number-flow/svelte';
 	import type { BazaarProductSnapshot } from '$lib/market/aggregate';
-	import { formatCompact, formatPrice } from '$lib/format';
 
 	interface Props {
 		qs: BazaarProductSnapshot['qs'];
@@ -8,15 +8,18 @@
 
 	const { qs }: Props = $props();
 
+	const PRICE: Intl.NumberFormatOptions = { maximumFractionDigits: 1 };
+	const COMPACT: Intl.NumberFormatOptions = { notation: 'compact', maximumFractionDigits: 1 };
+
 	const FIELDS = [
-		{ key: 'bp', label: 'Buy Price', format: formatPrice },
-		{ key: 'sp', label: 'Sell Price', format: formatPrice },
-		{ key: 'bv', label: 'Buy Volume', format: formatCompact },
-		{ key: 'sv', label: 'Sell Volume', format: formatCompact },
-		{ key: 'bmw', label: 'Weekly Buys', format: formatCompact },
-		{ key: 'smw', label: 'Weekly Sells', format: formatCompact },
-		{ key: 'bo', label: 'Buy Orders', format: formatCompact },
-		{ key: 'so', label: 'Sell Orders', format: formatCompact }
+		{ key: 'bp', label: 'Buy Price', format: PRICE },
+		{ key: 'sp', label: 'Sell Price', format: PRICE },
+		{ key: 'bv', label: 'Buy Volume', format: COMPACT },
+		{ key: 'sv', label: 'Sell Volume', format: COMPACT },
+		{ key: 'bmw', label: 'Weekly Buys', format: COMPACT },
+		{ key: 'smw', label: 'Weekly Sells', format: COMPACT },
+		{ key: 'bo', label: 'Buy Orders', format: COMPACT },
+		{ key: 'so', label: 'Sell Orders', format: COMPACT }
 	] as const;
 
 	type Key = (typeof FIELDS)[number]['key'];
@@ -65,7 +68,7 @@
 						? 'text-down'
 						: ''}"
 			>
-				{field.format(qs[field.key])}
+				<NumberFlow value={Math.round(qs[field.key] * 10) / 10} format={field.format} />
 			</dd>
 		</div>
 	{/each}

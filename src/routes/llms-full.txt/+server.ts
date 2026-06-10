@@ -17,7 +17,7 @@ export const GET: RequestHandler = () => {
 		.sort((a, b) => a.name.localeCompare(b.name))
 		.map(
 			({ name, id, snap }) =>
-				`- ${name}: instabuy ${formatPrice(snap.qs.bp)} / instasell ${formatPrice(snap.qs.sp)} coins — ${site.url}/bazaar/${slugFromId(id)}`
+				`- ${name}: instabuy ${formatPrice(snap.qs.bp)} / instasell ${formatPrice(snap.qs.sp)} coins: ${site.url}/bazaar/${slugFromId(id)}`
 		);
 
 	const auctionLines = Object.entries(auctions.items)
@@ -25,10 +25,10 @@ export const GET: RequestHandler = () => {
 		.sort((a, b) => a.stats.name.localeCompare(b.stats.name))
 		.map(
 			({ id, stats }) =>
-				`- ${stats.name} (${stats.tier}): lowest BIN ${formatPrice(stats.lowestBin)} / median BIN ${formatPrice(stats.medianBin)} coins, ${stats.count} listings — ${site.url}/auctions/${slugFromId(id)}`
+				`- ${stats.name} (${stats.tier}): lowest BIN ${formatPrice(stats.lowestBin)} / median BIN ${formatPrice(stats.medianBin)} coins, ${stats.count} listings: ${site.url}/auctions/${slugFromId(id)}`
 		);
 
-	const body = `# ${site.title} — full item directory
+	const body = `# ${site.title} full item directory
 
 ${site.description}
 Data from the official Hypixel API, last refreshed ${updated}. Prices in Skyblock coins.

@@ -81,7 +81,7 @@
 		<Search size={16} strokeWidth={1.5} class="shrink-0 text-muted" aria-hidden="true" />
 		<input
 			type="search"
-			placeholder="Search any item — Enchanted Diamond, Hyperion, …"
+			placeholder="Search any item, like Enchanted Diamond or Hyperion"
 			bind:value={query}
 			onkeydown={onKeydown}
 			onfocus={() => {

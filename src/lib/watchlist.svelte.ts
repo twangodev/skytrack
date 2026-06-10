@@ -21,7 +21,7 @@ function persist(): void {
 	try {
 		localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
 	} catch {
-		// storage may be unavailable (private mode, quota) — keep in-memory state
+		// storage may be unavailable (private mode, quota) - keep in-memory state
 	}
 }
 

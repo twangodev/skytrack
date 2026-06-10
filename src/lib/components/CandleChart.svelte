@@ -3,7 +3,7 @@
 
 	interface Props {
 		candles: Candle[];
-		/** bucket width in seconds — drives candle body width on the time axis */
+		/** bucket width in seconds - drives candle body width on the time axis */
 		bucketSeconds: number;
 	}
 

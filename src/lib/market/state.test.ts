@@ -115,11 +115,11 @@ describe('rollup', () => {
 			{ t: base + 1500, b: 2, s: 1 }
 		];
 		const incremental = stateWithBazaarRaw({ A: [...points] });
-		// run 1: cutoff lands mid-hour — nothing may spill yet
+		// run 1: cutoff lands mid-hour - nothing may spill yet
 		rollup(incremental, base + 900 + HOURLY_CUTOVER);
 		expect(incremental.bazaar.hourly.get('A') ?? []).toEqual([]);
 		expect(incremental.bazaar.raw.get('A')).toHaveLength(3);
-		// run 2: the hour is complete — all three points spill together
+		// run 2: the hour is complete - all three points spill together
 		rollup(incremental, base + HOUR + HOURLY_CUTOVER);
 		expect(incremental.bazaar.hourly.get('A')).toEqual([{ t: base, b: 2, s: 1 }]);
 	});

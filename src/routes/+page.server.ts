@@ -29,7 +29,8 @@ export function load() {
 				slug: slugFromId(id),
 				name: items[id]?.name ?? titleCase(id),
 				price: snap.qs.bp,
-				change: (last - first) / first
+				change: (last - first) / first,
+				spark: history.map((h) => [h.t, h.b] as [number, number])
 			};
 		})
 		.filter((m) => m !== null)

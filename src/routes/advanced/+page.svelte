@@ -22,5 +22,5 @@
 </svelte:head>
 
 <p class="text-sm text-muted">
-	This page has moved — continue to <a href="/bazaar" class="text-accent">the bazaar</a>.
+	This page has moved. Continue to <a href="/bazaar" class="text-accent">the bazaar</a>.
 </p>

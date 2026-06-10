@@ -1,4 +1,5 @@
 <script lang="ts">
+	import NumberFlow from '@number-flow/svelte';
 	import { Area, Chart, Highlight, LinearGradient, Rule, Spline, Svg, Tooltip } from 'layerchart';
 	import { scaleTime } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
@@ -48,7 +49,7 @@
 		fetched = null;
 		if (!browser) return;
 		void loadSeries(target).then((data) => {
-			// don't memoize failures — a transient blip would otherwise stick
+			// don't memoize failures - a transient blip would otherwise stick
 			// until a full page reload
 			if (data === null) seriesCache.delete(target);
 			if (target === slug) fetched = data;
@@ -91,7 +92,7 @@
 	};
 
 	const selectedRangeSeconds = $derived((RANGES.find((r) => r.key === range) ?? RANGES[3]).seconds);
-	// a range with under two points can't show change — fall back to ALL, and
+	// a range with under two points can't show change - fall back to ALL, and
 	// keep the label, secondary series, and candle bucket consistent with that
 	const effectiveRangeSeconds = $derived(
 		clip(primaryPoints, selectedRangeSeconds).length >= 2 ? selectedRangeSeconds : Infinity
@@ -158,7 +159,7 @@
 <section class="flex flex-col gap-3">
 	<div>
 		<p class="font-mono text-3xl tabular-nums">
-			{formatPrice(current)}
+			<NumberFlow value={Math.round(current * 10) / 10} format={{ maximumFractionDigits: 1 }} />
 			<span class="text-sm text-muted">{unit}</span>
 		</p>
 		<p class="mt-1 font-mono text-sm tabular-nums {tone}">
@@ -170,7 +171,7 @@
 
 	{#if !enough || (style === 'candles' && candles.length < 2)}
 		<p class="rounded-md border border-subtle bg-surface px-4 py-10 text-center text-xs text-muted">
-			Not enough history yet — check back after a few updates.
+			Not enough history yet. Check back after a few updates.
 		</p>
 	{:else if style === 'candles'}
 		<div class="h-[220px] w-full">

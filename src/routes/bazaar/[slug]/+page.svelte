@@ -52,12 +52,12 @@
 </script>
 
 <SEO
-	title={`${data.name} — Bazaar Price`}
+	title={`${data.name} Bazaar Price`}
 	{description}
 	canonical={`/bazaar/${data.slug}`}
 	jsonLd={[
 		itemPageSchema({
-			name: `${data.name} — Hypixel Skyblock Bazaar Price`,
+			name: `${data.name} Hypixel Skyblock Bazaar Price`,
 			url: `${site.url}/bazaar/${data.slug}`,
 			description
 		}),

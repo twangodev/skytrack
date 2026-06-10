@@ -69,7 +69,7 @@
 	--color-down: #e07a70;
 }
 
-/* Skyblock rarity colors, tuned per theme (not @theme tokens — only ever
+/* Skyblock rarity colors, tuned per theme (not @theme tokens - only ever
    referenced by RarityBadge via var(), never as utilities) */
 :root {
 	--rarity-uncommon: #4d8a51;

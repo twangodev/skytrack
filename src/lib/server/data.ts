@@ -51,7 +51,7 @@ export const auctionSlugMap = () =>
 function loadTier<P>(name: string): Map<string, P[]> {
 	return cached(`state:${name}`, () => {
 		const path = `${STATE_DIR}/${name}.binpb`;
-		// tolerate missing state locally — pages render with empty history
+		// tolerate missing state locally - pages render with empty history
 		if (!existsSync(path)) return new Map<string, P[]>();
 		return decodeStateFile(new Uint8Array(readFileSync(path))).items as Map<string, P[]>;
 	});

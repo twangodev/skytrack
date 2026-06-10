@@ -47,7 +47,7 @@
 
 <SEO
 	title="Bazaar Flips"
-	description={`Flipping margins and spreads for ${data.rows.length} profitable Hypixel Skyblock bazaar products — buy-order to sell-offer profit, margin, and weekly volume.`}
+	description={`Flipping margins and spreads for ${data.rows.length} profitable Hypixel Skyblock bazaar products: buy-order to sell-offer profit, margin, and weekly volume.`}
 	canonical="/flips"
 	jsonLd={breadcrumbSchema([
 		{ name: site.title, url: site.url },
@@ -134,6 +134,6 @@
 
 	<p class="text-xs text-muted">
 		Assumes buy order at instasell +0.1, sell offer at instabuy −0.1, and the 1.25% bazaar tax.
-		Margins move fast — verify in game.
+		Margins move fast, so verify in game.
 	</p>
 </div>

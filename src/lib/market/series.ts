@@ -6,7 +6,7 @@ export type AuctionTuple = [t: number, l: number, m: number, c: number];
 
 /**
  * Per-item chart endpoint. Tiers mirror the state tiers and are disjoint in
- * time (raw: last 30d @15min, hourly: 30–120d, daily: older) — clients concat
+ * time (raw: last 30d @15min, hourly: 30–120d, daily: older) - clients concat
  * and slice ranges from the merged series.
  */
 export interface ItemSeriesJson {

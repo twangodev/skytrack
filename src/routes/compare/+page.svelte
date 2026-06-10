@@ -10,7 +10,7 @@
 				.then((res) => (res.ok ? (res.json() as Promise<ItemSeriesJson>) : null))
 				.catch(() => null)
 				.then((json) => {
-					// don't memoize failures — allow a retry on the next add
+					// don't memoize failures - allow a retry on the next add
 					if (json === null) seriesCache.delete(slug);
 					return json;
 				});
@@ -296,7 +296,7 @@
 				type="search"
 				placeholder={atMax
 					? 'Maximum of three items'
-					: 'Add an item — Enchanted Diamond, Hyperion, …'}
+					: 'Add an item, like Enchanted Diamond or Hyperion'}
 				disabled={atMax}
 				bind:value={query}
 				onkeydown={onKeydown}
@@ -418,7 +418,7 @@
 		</div>
 	{:else if allLoaded}
 		<p class="rounded-md border border-subtle bg-surface px-4 py-10 text-center text-xs text-muted">
-			Not enough overlapping history to compare — try a wider range or different items.
+			Not enough overlapping history to compare. Try a wider range or different items.
 		</p>
 	{/if}
 

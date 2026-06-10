@@ -1,5 +1,6 @@
 <script lang="ts">
 	import SEO from '$lib/components/SEO.svelte';
+	import Sparkline from '$lib/components/Sparkline.svelte';
 	import LastUpdated from '$lib/components/LastUpdated.svelte';
 	import { formatPrice } from '$lib/format';
 	import { breadcrumbSchema } from '$lib/schema';
@@ -23,7 +24,7 @@
 
 <SEO
 	title="Top Movers"
-	description="Biggest gainers and losers on the Hypixel Skyblock bazaar over the past day and week — liquid products ranked by price change."
+	description="Biggest gainers and losers on the Hypixel Skyblock bazaar over the past day and week, liquid products ranked by price change."
 	canonical="/movers"
 	jsonLd={breadcrumbSchema([
 		{ name: site.title, url: site.url },
@@ -64,6 +65,7 @@
 						<thead>
 							<tr class="border-b border-subtle text-left text-xs text-muted">
 								<th class="py-2 pr-4 font-normal">Item</th>
+								<th class="py-2 pr-4 font-normal"><span class="sr-only">Trend</span></th>
 								<th class="py-2 pr-4 text-right font-normal">Price</th>
 								<th class="py-2 text-right font-normal">Change</th>
 							</tr>
@@ -75,6 +77,11 @@
 										<a href="/bazaar/{row.slug}" class="transition-colors hover:text-accent">
 											{row.name}
 										</a>
+									</td>
+									<td class="py-1.5 pr-4">
+										<div class="h-5 w-20 {row.change > 0 ? 'text-up' : 'text-down'}">
+											<Sparkline points={row.spark} />
+										</div>
 									</td>
 									<td class="py-1.5 pr-4 text-right font-mono tabular-nums">
 										{formatPrice(row.price)}
@@ -89,7 +96,7 @@
 								</tr>
 							{:else}
 								<tr>
-									<td colspan="3" class="py-8 text-center text-muted">Not enough history yet.</td>
+									<td colspan="4" class="py-8 text-center text-muted">Not enough history yet.</td>
 								</tr>
 							{/each}
 						</tbody>

@@ -12,7 +12,7 @@
 
 	const description = $derived(
 		`${data.name} is worth ${formatPrice(data.stats.lowestBin)} coins (lowest BIN) on the Hypixel ` +
-			`Skyblock auction house — median BIN ${formatPrice(data.stats.medianBin)} across ${data.stats.count} active listings.`
+			`Skyblock auction house, with a median BIN of ${formatPrice(data.stats.medianBin)} across ${data.stats.count} active listings.`
 	);
 
 	const cells = $derived([
@@ -22,12 +22,12 @@
 </script>
 
 <SEO
-	title={`${data.name} — Auction Price`}
+	title={`${data.name} Auction Price`}
 	{description}
 	canonical={`/auctions/${data.slug}`}
 	jsonLd={[
 		itemPageSchema({
-			name: `${data.name} — Hypixel Skyblock Auction Price`,
+			name: `${data.name} Hypixel Skyblock Auction Price`,
 			url: `${site.url}/auctions/${data.slug}`,
 			description
 		}),

@@ -26,6 +26,7 @@ import {
 	totalPoints,
 	latestTimestamp,
 	type MarketState,
+	type KindName,
 	type BazaarPoint,
 	type AuctionPoint
 } from '../src/lib/market/state';
@@ -69,27 +70,75 @@ function isFresh(): boolean {
 	}
 }
 
+/**
+ * A first deploy is the only situation where starting from empty state is
+ * legitimate. Auto-detect it: the site must be alive (so a 404 means "never
+ * published", not "unreachable") and no backups may exist. BOOTSTRAP=1
+ * remains as a manual override for recovery scenarios.
+ */
+async function assertFirstDeploy(): Promise<void> {
+	if (bootstrap) return;
+	const probe = await fetch(`${SITE_DATA}/`).catch(() => null);
+	if (!probe?.ok) {
+		throw new Error(
+			`site unreachable (${SITE_DATA}); cannot tell a first deploy from an outage — refusing to reset the chain`
+		);
+	}
+	const token = process.env.GH_TOKEN;
+	if (token) {
+		const repo = process.env.GITHUB_REPOSITORY ?? 'twangodev/skytrack';
+		const res = await fetch(`https://api.github.com/repos/${repo}/releases/tags/data-backup`, {
+			headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' }
+		});
+		if (res.ok) {
+			const release = (await res.json()) as { assets?: unknown[] };
+			if (release.assets?.length) {
+				throw new Error(
+					'state routes 404 but data-backup release has assets — history existed; restore it into static/data/state/ instead of bootstrapping'
+				);
+			}
+		}
+	} else {
+		console.warn('no GH_TOKEN; skipping backup-release check before bootstrap');
+	}
+	console.warn('auto-bootstrap: site is live but has never published state — starting empty');
+}
+
 /** Previous deploy's state: local files win (repeat local runs), else the live site. */
 async function restoreState(): Promise<MarketState> {
-	const state = emptyState();
+	const found: { name: string; kind: KindName; tier: string; bytes: Uint8Array }[] = [];
+	const missing: string[] = [];
 	for (const { name, kind, tier } of STATE_FILES) {
 		const localPath = `${STATE_DIR}/${name}.binpb`;
-		let bytes: Uint8Array | null = null;
 		if (existsSync(localPath)) {
-			bytes = new Uint8Array(readFileSync(localPath));
-		} else {
-			const res = await fetch(`${SITE_DATA}/data/state/${name}.binpb`);
-			if (res.ok) bytes = new Uint8Array(await res.arrayBuffer());
+			found.push({ name, kind, tier, bytes: new Uint8Array(readFileSync(localPath)) });
+			continue;
 		}
-		if (bytes === null) {
-			if (bootstrap) {
-				console.warn(`no previous state for ${name}; bootstrapping empty`);
-				continue;
-			}
+		const url = `${SITE_DATA}/data/state/${name}.binpb`;
+		const res = await fetch(url).catch((error) => {
+			throw new Error(`state unreachable: ${url} (${error}) — refusing to reset the chain`);
+		});
+		if (res.ok) {
+			found.push({ name, kind, tier, bytes: new Uint8Array(await res.arrayBuffer()) });
+		} else if (res.status === 404) {
+			missing.push(name);
+		} else {
 			throw new Error(
-				`previous state missing: ${name}.binpb — refusing to reset the chain (set BOOTSTRAP=1 to start empty)`
+				`state fetch failed: ${url} -> HTTP ${res.status} — refusing to reset the chain`
 			);
 		}
+	}
+
+	if (missing.length === STATE_FILES.length) {
+		await assertFirstDeploy();
+	} else if (missing.length > 0 && !bootstrap) {
+		throw new Error(
+			`partial state: missing ${missing.join(', ')} while others exist — refusing to proceed (set BOOTSTRAP=1 to override)`
+		);
+	}
+
+	const state = emptyState();
+	for (const { name, kind, tier, bytes } of found) {
 		const decoded = decodeStateFile(bytes);
 		if (decoded.kind !== kind || decoded.tier !== tier) {
 			throw new Error(

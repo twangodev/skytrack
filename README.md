@@ -49,13 +49,14 @@ bun run dev
 `bun run test` runs the vitest suite, `bun run check` type-checks, `bun run proto` regenerates
 the protobuf code after editing `proto/history.proto`.
 
-## First deploy
+## First deploy & recovery
 
 The pipeline refuses to start from empty state (that guard is what protects a year of history
-from a bad deploy). For the very first run on a fresh domain, set the repository variable
-`BOOTSTRAP=1`, let one scheduled run deploy, then delete the variable. To recover after a chain
-loss, download the newest assets from the `data-backup` release into `static/data/state/`
-(dropping the date prefix) and run the same way.
+from a bad deploy), but it auto-detects a genuine first deploy: if the site responds while every
+state route 404s — and no `data-backup` release assets exist — it bootstraps empty on its own.
+An outage, a partial state, or existing backups all still abort. To recover after a chain loss,
+download the newest assets from the `data-backup` release into `static/data/state/` (dropping
+the date prefix) and run with the repository variable `BOOTSTRAP=1` as a manual override.
 
 ## Disclaimer
 

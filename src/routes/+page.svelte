@@ -31,10 +31,11 @@
 		<div class="w-full max-w-lg">
 			<ItemSearch />
 		</div>
-		<a href="/compare" class="text-xs text-muted transition-colors hover:text-accent">
-			or compare items &rarr;
-		</a>
-		<p class="text-xs text-muted"><LastUpdated at={data.lastUpdated} /></p>
+		<p class="flex items-center gap-2 text-xs text-muted">
+			<LastUpdated at={data.lastUpdated} />
+			<span aria-hidden="true">·</span>
+			<a href="/compare" class="transition-colors hover:text-accent">compare items &rarr;</a>
+		</p>
 	</section>
 
 	<section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

@@ -68,3 +68,25 @@
 	--color-up: #5bbd84;
 	--color-down: #e07a70;
 }
+
+/* Skyblock rarity colors, tuned per theme (not @theme tokens — only ever
+   referenced by RarityBadge via var(), never as utilities) */
+:root {
+	--rarity-uncommon: #4d8a51;
+	--rarity-rare: #3d6cb8;
+	--rarity-epic: #84489e;
+	--rarity-legendary: #b07c2a;
+	--rarity-mythic: #ad4a9b;
+	--rarity-divine: #3a98a6;
+	--rarity-special: #b04a4a;
+}
+
+:root.dark {
+	--rarity-uncommon: #76c47b;
+	--rarity-rare: #6f9fe8;
+	--rarity-epic: #bb7fd6;
+	--rarity-legendary: #e0a94d;
+	--rarity-mythic: #e07ccd;
+	--rarity-divine: #67ccdb;
+	--rarity-special: #de7676;
+}

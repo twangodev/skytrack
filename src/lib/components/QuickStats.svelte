@@ -8,34 +8,59 @@
 
 	const { qs }: Props = $props();
 
-	type Stat = { label: string; value: string; tone?: 'up' | 'down' };
+	const FIELDS = [
+		{ key: 'bp', label: 'Buy Price', format: formatPrice },
+		{ key: 'sp', label: 'Sell Price', format: formatPrice },
+		{ key: 'bv', label: 'Buy Volume', format: formatCompact },
+		{ key: 'sv', label: 'Sell Volume', format: formatCompact },
+		{ key: 'bmw', label: 'Weekly Buys', format: formatCompact },
+		{ key: 'smw', label: 'Weekly Sells', format: formatCompact },
+		{ key: 'bo', label: 'Buy Orders', format: formatCompact },
+		{ key: 'so', label: 'Sell Orders', format: formatCompact }
+	] as const;
 
-	const stats: Stat[] = $derived([
-		{ label: 'Buy Price', value: formatPrice(qs.bp), tone: 'down' },
-		{ label: 'Sell Price', value: formatPrice(qs.sp), tone: 'up' },
-		{ label: 'Buy Volume', value: formatCompact(qs.bv) },
-		{ label: 'Sell Volume', value: formatCompact(qs.sv) },
-		{ label: 'Weekly Buys', value: formatCompact(qs.bmw) },
-		{ label: 'Weekly Sells', value: formatCompact(qs.smw) },
-		{ label: 'Buy Orders', value: formatCompact(qs.bo) },
-		{ label: 'Sell Orders', value: formatCompact(qs.so) }
-	]);
+	type Key = (typeof FIELDS)[number]['key'];
+
+	// flash green/red when a live poll moves a value, like the original site
+	let flashes = $state<Partial<Record<Key, 'up' | 'down'>>>({});
+	let previous: BazaarProductSnapshot['qs'] | null = null;
+	let timer: ReturnType<typeof setTimeout> | null = null;
+
+	$effect(() => {
+		const next: Partial<Record<Key, 'up' | 'down'>> = {};
+		if (previous) {
+			for (const { key } of FIELDS) {
+				if (qs[key] > previous[key]) next[key] = 'up';
+				else if (qs[key] < previous[key]) next[key] = 'down';
+			}
+		}
+		previous = qs;
+		if (Object.keys(next).length > 0) {
+			flashes = next;
+			if (timer) clearTimeout(timer);
+			timer = setTimeout(() => (flashes = {}), 1200);
+		}
+		return () => {
+			if (timer) clearTimeout(timer);
+		};
+	});
 </script>
 
 <dl
 	class="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-subtle bg-subtle sm:grid-cols-4"
 >
-	{#each stats as stat (stat.label)}
+	{#each FIELDS as field (field.key)}
 		<div class="flex flex-col gap-0.5 bg-surface px-4 py-3">
-			<dt class="text-xs text-muted">{stat.label}</dt>
+			<dt class="text-xs text-muted">{field.label}</dt>
 			<dd
-				class="font-mono text-sm tabular-nums {stat.tone === 'up'
+				class="font-mono text-sm tabular-nums transition-colors duration-700 {flashes[field.key] ===
+				'up'
 					? 'text-up'
-					: stat.tone === 'down'
+					: flashes[field.key] === 'down'
 						? 'text-down'
 						: ''}"
 			>
-				{stat.value}
+				{field.format(qs[field.key])}
 			</dd>
 		</div>
 	{/each}

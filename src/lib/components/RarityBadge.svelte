@@ -5,17 +5,17 @@
 
 	const { tier }: Props = $props();
 
-	// Skyblock rarity colors, slightly desaturated to sit in the warm palette
+	// theme-aware tokens defined in layout.css
 	const COLORS: Record<string, string> = {
 		COMMON: 'var(--color-muted)',
-		UNCOMMON: '#5fa463',
-		RARE: '#4d7fd1',
-		EPIC: '#9a5bbd',
-		LEGENDARY: '#d1953c',
-		MYTHIC: '#c95bb7',
-		DIVINE: '#4cb5c4',
-		SPECIAL: '#c45959',
-		VERY_SPECIAL: '#c45959'
+		UNCOMMON: 'var(--rarity-uncommon)',
+		RARE: 'var(--rarity-rare)',
+		EPIC: 'var(--rarity-epic)',
+		LEGENDARY: 'var(--rarity-legendary)',
+		MYTHIC: 'var(--rarity-mythic)',
+		DIVINE: 'var(--rarity-divine)',
+		SPECIAL: 'var(--rarity-special)',
+		VERY_SPECIAL: 'var(--rarity-special)'
 	};
 
 	const color = $derived(COLORS[tier] ?? 'var(--color-muted)');

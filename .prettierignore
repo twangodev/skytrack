@@ -2,6 +2,7 @@
 build/
 node_modules/
 src/lib/data/
-data/history/
+static/data/
+src/lib/proto/
 bun.lock
 docs/

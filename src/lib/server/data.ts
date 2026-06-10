@@ -1,11 +1,5 @@
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
-import {
-	decodeNdjson,
-	type BazaarRow,
-	type AuctionRow,
-	type BazaarDailyRow,
-	type AuctionDailyRow
-} from '$lib/market/history';
+import { readFileSync, existsSync } from 'node:fs';
+import { decodeStateFile, type BazaarPoint, type AuctionPoint } from '$lib/market/state';
 import type { BazaarProductSnapshot, AuctionItemStats } from '$lib/market/aggregate';
 import { buildSlugMap } from '$lib/slug';
 
@@ -30,7 +24,7 @@ export type BazaarHistoryPoint = { t: number; b: number; s: number };
 export type AuctionHistoryPoint = { t: number; l: number; m: number; c: number };
 
 const DATA_DIR = 'src/lib/data';
-const HISTORY_DIR = 'data/history';
+const STATE_DIR = 'static/data/state';
 
 // Module-level caches: ~4k prerendered pages hit these loaders; parse once.
 const cache = new Map<string, unknown>();
@@ -54,65 +48,35 @@ export const bazaarSlugMap = () =>
 export const auctionSlugMap = () =>
 	cached('auctionSlugs', () => buildSlugMap(Object.keys(loadAuctions().items)));
 
-function readHistoryRows<T>(kind: 'bazaar' | 'auctions'): { daily: T[]; recent: T[] } {
-	return cached(`history:${kind}`, () => {
-		const dir = `${HISTORY_DIR}/${kind}`;
-		if (!existsSync(dir)) return { daily: [] as T[], recent: [] as T[] };
-		const daily: T[] = [];
-		const recent: T[] = [];
-		for (const name of readdirSync(dir).sort()) {
-			if (!name.endsWith('.ndjson')) continue;
-			const rows = decodeNdjson<T>(readFileSync(`${dir}/${name}`, 'utf8'));
-			(name === 'daily.ndjson' ? daily : recent).push(...rows);
-		}
-		return { daily, recent };
+function loadTier<P>(name: string): Map<string, P[]> {
+	return cached(`state:${name}`, () => {
+		const path = `${STATE_DIR}/${name}.binpb`;
+		// tolerate missing state locally — pages render with empty history
+		if (!existsSync(path)) return new Map<string, P[]>();
+		return decodeStateFile(new Uint8Array(readFileSync(path))).items as Map<string, P[]>;
 	});
 }
 
-const NOON_UTC = 12 * 3600;
-const dateToT = (d: string) => Math.floor(Date.parse(`${d}T00:00:00Z`) / 1000) + NOON_UTC;
+const DAY = 86_400;
+const tail = <P extends { t: number }>(points: P[], windowSeconds: number): P[] => {
+	const newest = points[points.length - 1]?.t ?? 0;
+	return points.filter((p) => p.t >= newest - windowSeconds);
+};
 
-function groupHistory<Row, Daily, Point>(
-	kind: 'bazaar' | 'auctions',
-	idOfRow: (r: Row) => string,
-	idOfDaily: (r: Daily) => string,
-	pointOfRow: (r: Row) => Point,
-	pointOfDaily: (r: Daily) => Point
-): Map<string, Point[]> {
-	return cached(`grouped:${kind}`, () => {
-		const { daily, recent } = readHistoryRows<unknown>(kind);
-		const map = new Map<string, Point[]>();
-		const push = (id: string, point: Point) => {
-			const list = map.get(id) ?? [];
-			list.push(point);
-			map.set(id, list);
-		};
-		for (const row of daily as Daily[]) push(idOfDaily(row), pointOfDaily(row));
-		for (const row of recent as Row[]) push(idOfRow(row), pointOfRow(row));
-		return map;
-	});
-}
-
+/**
+ * SSR-embedded fallback series, capped so prerendered pages stay small:
+ * all daily, last 7d hourly, last 24h raw. The client fetches the full
+ * /data/items/{slug}.json for interactive ranges.
+ */
 export function bazaarHistory(productId: string): BazaarHistoryPoint[] {
-	return (
-		groupHistory<BazaarRow, BazaarDailyRow, BazaarHistoryPoint>(
-			'bazaar',
-			(r) => r.p,
-			(r) => r.p,
-			(r) => ({ t: r.t, b: r.b, s: r.s }),
-			(r) => ({ t: dateToT(r.d), b: r.b, s: r.s })
-		).get(productId) ?? []
-	);
+	const daily = loadTier<BazaarPoint>('bazaar-daily').get(productId) ?? [];
+	const hourly = loadTier<BazaarPoint>('bazaar-hourly').get(productId) ?? [];
+	const raw = loadTier<BazaarPoint>('bazaar-raw').get(productId) ?? [];
+	return [...daily, ...tail(hourly, 7 * DAY), ...tail(raw, DAY)].sort((a, b) => a.t - b.t);
 }
 
 export function auctionHistory(itemId: string): AuctionHistoryPoint[] {
-	return (
-		groupHistory<AuctionRow, AuctionDailyRow, AuctionHistoryPoint>(
-			'auctions',
-			(r) => r.i,
-			(r) => r.i,
-			(r) => ({ t: r.t, l: r.l, m: r.m, c: r.c }),
-			(r) => ({ t: dateToT(r.d), l: r.l, m: r.m, c: r.c })
-		).get(itemId) ?? []
-	);
+	const daily = loadTier<AuctionPoint>('auctions-daily').get(itemId) ?? [];
+	const raw = loadTier<AuctionPoint>('auctions-raw').get(itemId) ?? [];
+	return [...daily, ...tail(raw, 7 * DAY)].sort((a, b) => a.t - b.t);
 }

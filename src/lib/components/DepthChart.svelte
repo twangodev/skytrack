@@ -1,14 +1,9 @@
 <script lang="ts">
+	import { Area, Chart, Highlight, Rule, Svg, Tooltip } from 'layerchart';
+	import { scaleSymlog } from 'd3-scale';
+	import { curveStepAfter } from 'd3-shape';
 	import type { Level } from '$lib/market/aggregate';
-	import {
-		cumulative,
-		depthDomain,
-		logDepth,
-		logPoints,
-		scale,
-		stepPath,
-		type Point
-	} from '$lib/market/chart';
+	import { cumulative, depthDomain } from '$lib/market/chart';
 	import { formatCompact, formatPrice } from '$lib/format';
 
 	interface Props {
@@ -18,116 +13,67 @@
 
 	const { buy, sell }: Props = $props();
 
-	const W = 600;
-	const H = 200;
-	const PAD_BOTTOM = 18;
-	const PLOT_H = H - PAD_BOTTOM;
+	type Row = { ppu: number; depth: number; side: 'bid' | 'ask' };
 
-	const asks = $derived(cumulative(buy));
+	const toRows = (points: [number, number][], side: Row['side']): Row[] =>
+		points.map(([ppu, depth]) => ({ ppu, depth, side }));
+
+	const asks = $derived(toRows(cumulative(buy), 'ask'));
 	// bids arrive best-first (descending ppu); reverse so x ascends for drawing
-	const bids = $derived(cumulative(sell).toReversed());
+	const bids = $derived(toRows(cumulative(sell).toReversed(), 'bid'));
+	const rows = $derived([...bids, ...asks]);
 
-	const xd = $derived(depthDomain(buy, sell));
-	// log depth: bid and ask books are often orders of magnitude apart, and a
-	// linear scale flattens the thin side into invisibility
-	const maxDepth = $derived(Math.max(1, ...asks.map(([, y]) => y), ...bids.map(([, y]) => y)));
-	const yd = $derived([0, logDepth(maxDepth) * 1.05] as [number, number]);
+	const xDomain = $derived(depthDomain(buy, sell));
 
 	const mid = $derived(
 		buy.length && sell.length ? (buy[0][0] + sell[0][0]) / 2 : (buy[0]?.[0] ?? sell[0]?.[0] ?? 0)
 	);
-
-	function areaPath(points: Point[]): string {
-		if (points.length === 0) return '';
-		const open = stepPath(logPoints(points), xd, yd, W, PLOT_H);
-		const x0 = scale(points[0][0], xd, [0, W]);
-		return `${open}V${PLOT_H}H${x0}Z`;
-	}
-
-	let hover = $state<{ x: number; price: number; depth: number; side: 'bid' | 'ask' } | null>(null);
-
-	function onMove(event: PointerEvent) {
-		const svg = event.currentTarget as SVGSVGElement;
-		const rect = svg.getBoundingClientRect();
-		const price = scale(((event.clientX - rect.left) / rect.width) * W, [0, W], xd);
-		const all: { point: Point; side: 'bid' | 'ask' }[] = [
-			...bids.map((point) => ({ point, side: 'bid' as const })),
-			...asks.map((point) => ({ point, side: 'ask' as const }))
-		];
-		if (all.length === 0) return;
-		const nearest = all.reduce((a, b) =>
-			Math.abs(b.point[0] - price) < Math.abs(a.point[0] - price) ? b : a
-		);
-		hover = {
-			x: scale(nearest.point[0], xd, [0, W]),
-			price: nearest.point[0],
-			depth: nearest.point[1],
-			side: nearest.side
-		};
-	}
 </script>
 
 <figure class="flex flex-col gap-2">
 	<figcaption class="text-sm font-medium">Market Depth</figcaption>
-	<svg
-		viewBox="0 0 {W} {H}"
-		class="w-full touch-none select-none"
-		role="img"
-		aria-label="Cumulative market depth chart"
-		onpointermove={onMove}
-		onpointerleave={() => (hover = null)}
-	>
-		<!-- bids (instasell side) -->
-		<path d={areaPath(bids)} class="fill-up/15" />
-		<path
-			d={stepPath(logPoints(bids), xd, yd, W, PLOT_H)}
-			class="fill-none stroke-up"
-			stroke-width="1.5"
-		/>
-		<!-- asks (instabuy side) -->
-		<path d={areaPath(asks)} class="fill-down/15" />
-		<path
-			d={stepPath(logPoints(asks), xd, yd, W, PLOT_H)}
-			class="fill-none stroke-down"
-			stroke-width="1.5"
-		/>
-
-		<!-- mid price -->
-		<line
-			x1={scale(mid, xd, [0, W])}
-			x2={scale(mid, xd, [0, W])}
-			y1="0"
-			y2={PLOT_H}
-			class="stroke-muted"
-			stroke-dasharray="3 4"
-			stroke-width="1"
-		/>
-
-		{#if hover}
-			<line x1={hover.x} x2={hover.x} y1="0" y2={PLOT_H} class="stroke-text/40" stroke-width="1" />
-			<text
-				x={hover.x + (hover.x > W / 2 ? -8 : 8)}
-				y="14"
-				text-anchor={hover.x > W / 2 ? 'end' : 'start'}
-				class="fill-text font-mono text-[11px]"
-			>
-				{formatPrice(hover.price)} · {formatCompact(hover.depth)}
-				{hover.side === 'bid' ? 'bid' : 'ask'}
-			</text>
-		{/if}
-
-		<!-- x axis labels -->
-		<text x="0" y={H - 4} class="fill-muted font-mono text-[10px]">{formatPrice(xd[0])}</text>
-		<text
-			x={scale(mid, xd, [0, W])}
-			y={H - 4}
-			text-anchor="middle"
-			class="fill-muted font-mono text-[10px]"
+	<div class="h-[200px] w-full font-mono text-[10px]">
+		<Chart
+			data={rows}
+			x="ppu"
+			{xDomain}
+			y="depth"
+			yDomain={[0, null]}
+			yScale={scaleSymlog()}
+			padding={{ bottom: 20 }}
+			tooltip={{ mode: 'bisect-x' }}
 		>
-			{formatPrice(mid)}
-		</text>
-		<text x={W} y={H - 4} text-anchor="end" class="fill-muted font-mono text-[10px]">
-			{formatPrice(xd[1])}
-		</text>
-	</svg>
+			<Svg>
+				<!-- symlog keeps a thin book visible next to one orders of magnitude deeper -->
+				<Area
+					data={bids}
+					curve={curveStepAfter}
+					class="fill-up/15"
+					line={{ class: 'stroke-up stroke-[1.5]' }}
+				/>
+				<Area
+					data={asks}
+					curve={curveStepAfter}
+					class="fill-down/15"
+					line={{ class: 'stroke-down stroke-[1.5]' }}
+				/>
+				<Rule x={mid} class="stroke-muted [stroke-dasharray:3,4]" />
+				<Highlight lines={{ class: 'stroke-muted' }} />
+			</Svg>
+			<Tooltip.Root class="border border-subtle bg-surface text-xs text-text shadow-lg" let:data>
+				<Tooltip.List>
+					<Tooltip.Item
+						label={data.side === 'bid' ? 'bid' : 'ask'}
+						value="{formatPrice(data.ppu)} · {formatCompact(data.depth)}"
+						classes={{ label: 'font-sans text-muted' }}
+					/>
+				</Tooltip.List>
+			</Tooltip.Root>
+		</Chart>
+	</div>
+	<div class="flex justify-between font-mono text-[10px] text-muted" aria-hidden="true">
+		<span>{formatPrice(xDomain[0])}</span>
+		<span>mid {formatPrice(mid)}</span>
+		<span>{formatPrice(xDomain[1])}</span>
+	</div>
 </figure>

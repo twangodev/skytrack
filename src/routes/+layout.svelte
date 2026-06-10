@@ -24,11 +24,10 @@
 <ModeWatcher defaultMode="dark" disableHeadScriptInjection />
 <svelte:head>
 	{#if !dev}
-		<!-- same analytics property the previous site reported to -->
 		<script
+			src="https://rybbit.twango.dev/api/script.js"
+			data-site-id="71ad45e5d76a"
 			defer
-			src="https://analytics.twango.dev/script.js"
-			data-website-id="e592eb98-f273-4d02-82c4-9b58c67532de"
 		></script>
 	{/if}
 	{@html `<script type="application/ld+json">${JSON.stringify(websiteSchema()).replace(/</g, '\\u003c')}${'</'}script>`}

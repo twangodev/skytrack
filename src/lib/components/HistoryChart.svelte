@@ -63,7 +63,11 @@
 					class="stroke-subtle"
 					stroke-width="1"
 				/>
-				<text x="0" y={scale(tick, yd, [PLOT_H, 0]) - 3} class="fill-muted font-mono text-[10px]">
+				<text
+					x="0"
+					y={Math.max(10, scale(tick, yd, [PLOT_H, 0]) - 3)}
+					class="fill-muted font-mono text-[10px]"
+				>
 					{formatCompact(tick)}
 				</text>
 			{/each}

@@ -15,9 +15,9 @@
 	);
 
 	const cells = $derived([
-		{ label: 'Lowest BIN', value: formatPrice(data.stats.lowestBin), highlight: true },
-		{ label: 'Median BIN', value: formatPrice(data.stats.medianBin) },
-		{ label: 'Active Listings', value: formatCompact(data.stats.count) }
+		{ label: 'Lowest BIN', value: formatPrice(data.stats.lowestBin), coins: true, highlight: true },
+		{ label: 'Median BIN', value: formatPrice(data.stats.medianBin), coins: true },
+		{ label: 'Active Listings', value: formatCompact(data.stats.count), coins: false }
 	]);
 </script>
 
@@ -62,7 +62,9 @@
 				<dt class="text-xs text-muted">{cell.label}</dt>
 				<dd class="font-mono tabular-nums {cell.highlight ? 'text-lg text-accent' : 'text-sm'}">
 					{cell.value}
-					<span class="text-xs text-muted">coins</span>
+					{#if cell.coins}
+						<span class="text-xs text-muted">coins</span>
+					{/if}
 				</dd>
 			</div>
 		{/each}

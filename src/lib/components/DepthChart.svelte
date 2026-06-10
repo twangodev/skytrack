@@ -20,8 +20,12 @@
 	const bids = $derived(cumulative(sell).toReversed());
 
 	const xd = $derived(depthDomain(buy, sell));
+	// log depth: bid and ask books are often orders of magnitude apart, and a
+	// linear scale flattens the thin side into invisibility
+	const logDepth = (y: number) => Math.log10(1 + y);
 	const maxDepth = $derived(Math.max(1, ...asks.map(([, y]) => y), ...bids.map(([, y]) => y)));
-	const yd = $derived([0, maxDepth * 1.05] as [number, number]);
+	const yd = $derived([0, logDepth(maxDepth) * 1.05] as [number, number]);
+	const logPoints = (points: Point[]): Point[] => points.map(([x, y]) => [x, logDepth(y)]);
 
 	const mid = $derived(
 		buy.length && sell.length ? (buy[0][0] + sell[0][0]) / 2 : (buy[0]?.[0] ?? sell[0]?.[0] ?? 0)
@@ -29,7 +33,7 @@
 
 	function areaPath(points: Point[]): string {
 		if (points.length === 0) return '';
-		const open = stepPath(points, xd, yd, W, PLOT_H);
+		const open = stepPath(logPoints(points), xd, yd, W, PLOT_H);
 		const x0 = scale(points[0][0], xd, [0, W]);
 		return `${open}V${PLOT_H}H${x0}Z`;
 	}
@@ -69,10 +73,18 @@
 	>
 		<!-- bids (instasell side) -->
 		<path d={areaPath(bids)} class="fill-up/15" />
-		<path d={stepPath(bids, xd, yd, W, PLOT_H)} class="fill-none stroke-up" stroke-width="1.5" />
+		<path
+			d={stepPath(logPoints(bids), xd, yd, W, PLOT_H)}
+			class="fill-none stroke-up"
+			stroke-width="1.5"
+		/>
 		<!-- asks (instabuy side) -->
 		<path d={areaPath(asks)} class="fill-down/15" />
-		<path d={stepPath(asks, xd, yd, W, PLOT_H)} class="fill-none stroke-down" stroke-width="1.5" />
+		<path
+			d={stepPath(logPoints(asks), xd, yd, W, PLOT_H)}
+			class="fill-none stroke-down"
+			stroke-width="1.5"
+		/>
 
 		<!-- mid price -->
 		<line

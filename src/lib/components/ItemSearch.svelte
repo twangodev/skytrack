@@ -1,30 +1,44 @@
 <script lang="ts">
 	import { Search } from '@lucide/svelte';
 	import { browser } from '$app/environment';
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 
-	export interface SearchItem {
+	interface SearchItem {
 		slug: string;
 		name: string;
 		kind: 'bazaar' | 'auctions';
+		lower: string;
 	}
-
-	interface Props {
-		items: SearchItem[];
-	}
-
-	const { items }: Props = $props();
 
 	// searchParams are unavailable while prerendering
 	let query = $state(browser ? (page.url.searchParams.get('q') ?? '') : '');
 	let selected = $state(0);
 	let focused = $state(false);
 
-	function rank(name: string, q: string): number {
-		const n = name.toLowerCase();
-		if (n.startsWith(q)) return 0;
-		if (n.includes(` ${q}`)) return 1;
-		if (n.includes(q)) return 2;
+	// The index is ~300KB; fetch it once the user shows intent to search.
+	let items = $state<SearchItem[]>([]);
+	let loadStarted = false;
+	async function ensureIndex() {
+		if (loadStarted || !browser) return;
+		loadStarted = true;
+		try {
+			const res = await fetch('/search-index.json');
+			const raw = (await res.json()) as Omit<SearchItem, 'lower'>[];
+			items = raw.map((item) => ({ ...item, lower: item.name.toLowerCase() }));
+		} catch {
+			loadStarted = false; // allow a retry on next focus
+		}
+	}
+
+	$effect(() => {
+		if (query.length > 0) void ensureIndex();
+	});
+
+	function rank(lower: string, q: string): number {
+		if (lower.startsWith(q)) return 0;
+		if (lower.includes(` ${q}`)) return 1;
+		if (lower.includes(q)) return 2;
 		return 3;
 	}
 
@@ -32,7 +46,7 @@
 		const q = query.trim().toLowerCase();
 		if (q.length < 2) return [];
 		return items
-			.map((item) => ({ item, rank: rank(item.name, q) }))
+			.map((item) => ({ item, rank: rank(item.lower, q) }))
 			.filter(({ rank }) => rank < 3)
 			.sort((a, b) => a.rank - b.rank || a.item.name.length - b.item.name.length)
 			.slice(0, 10)
@@ -55,7 +69,7 @@
 		} else if (event.key === 'Enter') {
 			event.preventDefault();
 			const target = results[selected];
-			if (target) location.href = `/${target.kind}/${target.slug}`;
+			if (target) void goto(`/${target.kind}/${target.slug}`);
 		}
 	}
 </script>
@@ -70,7 +84,10 @@
 			placeholder="Search any item — Enchanted Diamond, Hyperion, …"
 			bind:value={query}
 			onkeydown={onKeydown}
-			onfocus={() => (focused = true)}
+			onfocus={() => {
+				focused = true;
+				void ensureIndex();
+			}}
 			onblur={() => setTimeout(() => (focused = false), 150)}
 			role="combobox"
 			aria-expanded={focused && results.length > 0}

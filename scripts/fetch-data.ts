@@ -141,9 +141,7 @@ async function fetchAuctions(items: Record<string, { name: string }>): Promise<s
 		);
 	}
 	// listings shift pages while we crawl — dedup by uuid so none count twice
-	const auctions = [
-		...new Map(pages.flatMap((p) => p.auctions).map((a) => [a.uuid, a])).values()
-	];
+	const auctions = [...new Map(pages.flatMap((p) => p.auctions).map((a) => [a.uuid, a])).values()];
 	const bins = auctions.filter((a) => a.bin === true && a.claimed !== true);
 
 	const decoded: DecodedBin[] = [];

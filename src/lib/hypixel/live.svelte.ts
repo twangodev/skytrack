@@ -1,4 +1,4 @@
-import { bazaarResponse, type BazaarProduct } from '$lib/hypixel/types';
+import { bazaarProduct, type BazaarProduct } from '$lib/hypixel/types';
 import { BAZAAR_URL } from '$lib/hypixel/endpoints';
 
 const POLL_MS = 30_000;
@@ -38,11 +38,13 @@ export class LiveBazaar {
 		try {
 			const res = await fetch(BAZAAR_URL);
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
-			const parsed = bazaarResponse.parse(await res.json());
-			const product = parsed.products[this.#productId];
-			if (!product) throw new Error('product missing from response');
-			this.product = product;
-			this.lastUpdated = parsed.lastUpdated;
+			// the payload carries ~1600 products; validate only the one we show
+			const raw = (await res.json()) as {
+				lastUpdated?: number;
+				products?: Record<string, unknown>;
+			};
+			this.product = bazaarProduct.parse(raw.products?.[this.#productId]);
+			this.lastUpdated = typeof raw.lastUpdated === 'number' ? raw.lastUpdated : Date.now();
 			this.failed = false;
 		} catch {
 			this.failed = true;

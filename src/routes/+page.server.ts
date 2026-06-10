@@ -7,19 +7,6 @@ export function load() {
 	const auctions = loadAuctions();
 	const items = loadItems();
 
-	const searchIndex = [
-		...Object.keys(bazaar.products).map((id) => ({
-			slug: slugFromId(id),
-			name: items[id]?.name ?? titleCase(id),
-			kind: 'bazaar' as const
-		})),
-		...Object.entries(auctions.items).map(([id, stats]) => ({
-			slug: slugFromId(id),
-			name: stats.name,
-			kind: 'auctions' as const
-		}))
-	];
-
 	// Top movers: biggest |%Δ| in instabuy across today's snapshots, liquid items only.
 	const startOfToday = Math.floor(Date.parse(new Date().toISOString().slice(0, 10)) / 1000);
 	const movers = Object.entries(bazaar.products)
@@ -44,7 +31,6 @@ export function load() {
 		.slice(0, 6);
 
 	return {
-		searchIndex,
 		movers,
 		bazaarCount: Object.keys(bazaar.products).length,
 		auctionCount: Object.keys(auctions.items).length,

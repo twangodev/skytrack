@@ -22,7 +22,7 @@
 			{site.description}
 		</p>
 		<div class="w-full max-w-lg">
-			<ItemSearch items={data.searchIndex} />
+			<ItemSearch />
 		</div>
 		<p class="text-xs text-muted"><LastUpdated at={data.lastUpdated} /></p>
 	</section>

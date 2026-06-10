@@ -11,13 +11,10 @@ export const load: PageServerLoad = ({ params }) => {
 	if (!id) error(404, 'Unknown item');
 	const { lastUpdated, items } = loadAuctions();
 	const stats = items[id];
-	const meta = loadItems()[id];
 	return {
-		id,
 		slug: params.slug,
 		name: stats.name,
 		tier: stats.tier,
-		category: meta?.category,
 		stats,
 		history: auctionHistory(id),
 		lastUpdated

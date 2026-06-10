@@ -10,7 +10,6 @@ export function load() {
 			id,
 			slug: slugFromId(id),
 			name: items[id]?.name ?? titleCase(id),
-			category: items[id]?.category,
 			bp: snap.qs.bp,
 			sp: snap.qs.sp,
 			bmw: snap.qs.bmw,

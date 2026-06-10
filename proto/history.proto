@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package skytrack.v1;
+
+enum Kind {
+  KIND_UNSPECIFIED = 0;
+  KIND_BAZAAR = 1;
+  KIND_AUCTIONS = 2;
+}
+
+enum Tier {
+  TIER_UNSPECIFIED = 0;
+  TIER_RAW = 1;
+  TIER_HOURLY = 2;
+  TIER_DAILY = 3;
+}
+
+message HistoryFile {
+  uint32 version = 1;
+  Kind kind = 2;
+  Tier tier = 3;
+  repeated ItemSeries items = 4;
+}
+
+// Columnar, delta-encoded. Prices are round(coins * 10) so one decimal
+// survives integer encoding; deltas are vs the previous point (the first
+// delta is vs 0).
+message ItemSeries {
+  string id = 1;
+  repeated sint64 ts_delta = 2;
+  repeated sint64 price_a_delta = 3; // bazaar instabuy / auction lowest BIN
+  repeated sint64 price_b_delta = 4; // bazaar instasell / auction median BIN
+  repeated sint64 count = 5; // auctions only: active listings (absolute)
+}

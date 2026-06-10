@@ -14,9 +14,13 @@
 		"lint": "prettier --check .",
 		"test": "vitest run",
 		"fetch": "bun scripts/fetch-data.ts",
-		"icons": "bun scripts/generate-icons.ts"
+		"icons": "bun scripts/generate-icons.ts",
+		"proto": "buf generate"
 	},
 	"devDependencies": {
+		"@bufbuild/buf": "^1.70.0",
+		"@bufbuild/protobuf": "^2.12.0",
+		"@bufbuild/protoc-gen-es": "^2.12.0",
 		"@lucide/svelte": "^0.575.0",
 		"@sveltejs/adapter-static": "^3.0.10",
 		"@sveltejs/kit": "^2.57.1",

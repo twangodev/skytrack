@@ -2,7 +2,7 @@
 	import SEO from '$lib/components/SEO.svelte';
 	import LastUpdated from '$lib/components/LastUpdated.svelte';
 	import RarityBadge from '$lib/components/RarityBadge.svelte';
-	import HistoryChart from '$lib/components/HistoryChart.svelte';
+	import PriceOverview from '$lib/components/PriceOverview.svelte';
 	import { formatPrice, formatCompact } from '$lib/format';
 	import { breadcrumbSchema, itemPageSchema } from '$lib/schema';
 	import { site } from '$lib/config';
@@ -15,7 +15,6 @@
 	);
 
 	const cells = $derived([
-		{ label: 'Lowest BIN', value: formatPrice(data.stats.lowestBin), coins: true, highlight: true },
 		{ label: 'Median BIN', value: formatPrice(data.stats.medianBin), coins: true },
 		{ label: 'Active Listings', value: formatCompact(data.stats.count), coins: false }
 	]);
@@ -54,13 +53,19 @@
 		</p>
 	</div>
 
+	<PriceOverview
+		current={data.stats.lowestBin}
+		primary={{ label: 'Lowest BIN', points: data.history.map((h) => [h.t, h.l]) }}
+		secondary={{ label: 'Median BIN', points: data.history.map((h) => [h.t, h.m]) }}
+	/>
+
 	<dl
-		class="grid grid-cols-1 gap-px overflow-hidden rounded-lg border border-subtle bg-subtle sm:grid-cols-3"
+		class="grid grid-cols-1 gap-px overflow-hidden rounded-lg border border-subtle bg-subtle sm:grid-cols-2"
 	>
 		{#each cells as cell (cell.label)}
 			<div class="flex flex-col gap-0.5 bg-surface px-4 py-3">
 				<dt class="text-xs text-muted">{cell.label}</dt>
-				<dd class="font-mono tabular-nums {cell.highlight ? 'text-lg text-accent' : 'text-sm'}">
+				<dd class="font-mono text-sm tabular-nums">
 					{cell.value}
 					{#if cell.coins}
 						<span class="text-xs text-muted">coins</span>
@@ -69,22 +74,4 @@
 			</div>
 		{/each}
 	</dl>
-
-	<HistoryChart
-		title="BIN Price History"
-		lines={[
-			{
-				label: 'Lowest BIN',
-				points: data.history.map((h) => [h.t, h.l]),
-				colorClass: 'stroke-accent',
-				textClass: 'text-accent'
-			},
-			{
-				label: 'Median BIN',
-				points: data.history.map((h) => [h.t, h.m]),
-				colorClass: 'stroke-muted',
-				textClass: 'text-muted'
-			}
-		]}
-	/>
 </article>

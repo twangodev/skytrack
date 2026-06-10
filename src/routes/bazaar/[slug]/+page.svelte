@@ -5,12 +5,13 @@
 	import LastUpdated from '$lib/components/LastUpdated.svelte';
 	import RarityBadge from '$lib/components/RarityBadge.svelte';
 	import DepthChart from '$lib/components/DepthChart.svelte';
-	import HistoryChart from '$lib/components/HistoryChart.svelte';
+	import PriceOverview from '$lib/components/PriceOverview.svelte';
 	import { formatPrice } from '$lib/format';
 	import { breadcrumbSchema, itemPageSchema } from '$lib/schema';
 	import { site } from '$lib/config';
 	import { LiveBazaar } from '$lib/hypixel/live.svelte';
 	import { toSnapshot } from '$lib/market/aggregate';
+	import type { Point } from '$lib/market/chart';
 
 	const { data } = $props();
 
@@ -30,6 +31,18 @@
 	const updatedAt = $derived(
 		live?.product ? (live.lastUpdated ?? data.lastUpdated) : data.lastUpdated
 	);
+
+	// chart series extend to the live price so the line ticks in real time
+	const instabuy = $derived.by((): Point[] => {
+		const points: Point[] = data.history.map((h) => [h.t, h.b]);
+		if (live?.product) points.push([Math.floor(updatedAt / 1000), snapshot.qs.bp]);
+		return points;
+	});
+	const instasell = $derived.by((): Point[] => {
+		const points: Point[] = data.history.map((h) => [h.t, h.s]);
+		if (live?.product) points.push([Math.floor(updatedAt / 1000), snapshot.qs.sp]);
+		return points;
+	});
 
 	const description = $derived(
 		`${data.name} bazaar prices on Hypixel Skyblock: instabuy ${formatPrice(snapshot.qs.bp)} coins, ` +
@@ -72,6 +85,12 @@
 		</p>
 	</div>
 
+	<PriceOverview
+		current={snapshot.qs.bp}
+		primary={{ label: 'Instabuy', points: instabuy }}
+		secondary={{ label: 'Instasell', points: instasell }}
+	/>
+
 	<QuickStats qs={snapshot.qs} />
 
 	<DepthChart buy={snapshot.buy} sell={snapshot.sell} />
@@ -80,22 +99,4 @@
 		<OrderBookTable levels={snapshot.buy} side="buy" />
 		<OrderBookTable levels={snapshot.sell} side="sell" />
 	</div>
-
-	<HistoryChart
-		title="Price History"
-		lines={[
-			{
-				label: 'Instabuy',
-				points: data.history.map((h) => [h.t, h.b]),
-				colorClass: 'stroke-down',
-				textClass: 'text-down'
-			},
-			{
-				label: 'Instasell',
-				points: data.history.map((h) => [h.t, h.s]),
-				colorClass: 'stroke-up',
-				textClass: 'text-up'
-			}
-		]}
-	/>
 </article>

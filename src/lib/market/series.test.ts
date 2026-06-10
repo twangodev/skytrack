@@ -1,28 +1,45 @@
 import { describe, expect, test } from 'vitest';
-import { itemSeries, mergedSeries } from './series';
+import { itemSeries, mergedSeries, RAW_SLICE } from './series';
 import { emptyState } from './state';
 
 const HOUR = 3_600;
+const DAY = 86_400;
 
 describe('itemSeries', () => {
-	test('bazaar item mirrors tiers as tuples', () => {
+	test('bazaar raw is sliced to the trailing window', () => {
 		const state = emptyState();
 		const now = 1781000000;
 		state.bazaar.raw.set('A', [
+			{ t: now - RAW_SLICE - HOUR, b: 1, s: 0.5 }, // outside the slice
 			{ t: now - HOUR, b: 2, s: 1 },
 			{ t: now, b: 3, s: 1.5 }
 		]);
-		state.bazaar.hourly.set('A', [{ t: now - 40 * 24 * HOUR, b: 9, s: 8 }]);
-		state.bazaar.daily.set('A', [{ t: now - 200 * 24 * HOUR, b: 7, s: 6 }]);
-
 		const out = itemSeries(state, 'A');
 		expect(out.bazaar?.raw).toEqual([
 			[now - HOUR, 2, 1],
 			[now, 3, 1.5]
 		]);
-		expect(out.bazaar?.hourly).toEqual([[now - 40 * 24 * HOUR, 9, 8]]);
-		expect(out.bazaar?.daily).toEqual([[now - 200 * 24 * HOUR, 7, 6]]);
-		expect(out.auctions).toBeUndefined();
+	});
+
+	test('bazaar hourly is thinned to 4h points', () => {
+		const state = emptyState();
+		const aligned = Math.floor(1781000000 / (4 * HOUR)) * 4 * HOUR;
+		state.bazaar.hourly.set('A', [
+			{ t: aligned, b: 1, s: 0.5 }, // on the 4h grid, kept
+			{ t: aligned + HOUR, b: 2, s: 1 }, // off-grid, dropped
+			{ t: aligned + 4 * HOUR, b: 3, s: 1.5 } // on the grid, kept
+		]);
+		const out = itemSeries(state, 'A');
+		expect(out.bazaar?.hourly).toEqual([
+			[aligned, 1, 0.5],
+			[aligned + 4 * HOUR, 3, 1.5]
+		]);
+	});
+
+	test('daily passes through untouched', () => {
+		const state = emptyState();
+		state.bazaar.daily.set('A', [{ t: 1700000000 - 200 * DAY, b: 7, s: 6 }]);
+		expect(itemSeries(state, 'A').bazaar?.daily).toEqual([[1700000000 - 200 * DAY, 7, 6]]);
 	});
 
 	test('auction item: raw and daily tuples include count', () => {

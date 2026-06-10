@@ -4,10 +4,21 @@ import type { MarketState, BazaarPoint, AuctionPoint } from './state';
 export type BazaarTuple = [t: number, b: number, s: number];
 export type AuctionTuple = [t: number, l: number, m: number, c: number];
 
+const DAY = 86_400;
+const HOUR = 3_600;
+
 /**
- * Per-item chart endpoint. Tiers mirror the state tiers and are disjoint in
- * time (raw: last 30d @15min, hourly: 30–120d, daily: older) - clients concat
- * and slice ranges from the merged series.
+ * The state archives far more than browsers need (raw 90d, hourly 2y).
+ * Endpoints ship a trimmed view: raw covers the 1M range at full 15-min
+ * density, hourly is thinned to 4h points for the longer ranges.
+ */
+export const RAW_SLICE = 35 * DAY;
+const HOURLY_STEP_HOURS = 4;
+
+/**
+ * Per-item chart endpoint. Tiers are disjoint in time (raw newest, then
+ * hourly, then daily); clients concat and slice ranges from the merged
+ * series.
  */
 export interface ItemSeriesJson {
 	bazaar?: { raw: BazaarTuple[]; hourly: BazaarTuple[]; daily: BazaarTuple[] };
@@ -17,6 +28,17 @@ export interface ItemSeriesJson {
 const bazaarTuple = (p: BazaarPoint): BazaarTuple => [p.t, p.b, p.s];
 const auctionTuple = (p: AuctionPoint): AuctionTuple => [p.t, p.l, p.m, p.c];
 
+function rawSlice<P extends { t: number }>(points: P[]): P[] {
+	const newest = points[points.length - 1]?.t ?? 0;
+	return points.filter((p) => p.t >= newest - RAW_SLICE);
+}
+
+// decimation, not re-aggregation: hourly points are already medians, and for
+// chart rendering every Nth sample is indistinguishable from a 4h median
+function thinHourly<P extends { t: number }>(points: P[]): P[] {
+	return points.filter((p) => (p.t / HOUR) % HOURLY_STEP_HOURS === 0);
+}
+
 export function itemSeries(state: MarketState, id: string): ItemSeriesJson {
 	const out: ItemSeriesJson = {};
 
@@ -25,8 +47,8 @@ export function itemSeries(state: MarketState, id: string): ItemSeriesJson {
 	const daily = state.bazaar.daily.get(id);
 	if (raw?.length || hourly?.length || daily?.length) {
 		out.bazaar = {
-			raw: (raw ?? []).map(bazaarTuple),
-			hourly: (hourly ?? []).map(bazaarTuple),
+			raw: rawSlice(raw ?? []).map(bazaarTuple),
+			hourly: thinHourly(hourly ?? []).map(bazaarTuple),
 			daily: (daily ?? []).map(bazaarTuple)
 		};
 	}
@@ -35,7 +57,7 @@ export function itemSeries(state: MarketState, id: string): ItemSeriesJson {
 	const auctionDaily = state.auctions.daily.get(id);
 	if (auctionRaw?.length || auctionDaily?.length) {
 		out.auctions = {
-			raw: (auctionRaw ?? []).map(auctionTuple),
+			raw: rawSlice(auctionRaw ?? []).map(auctionTuple),
 			daily: (auctionDaily ?? []).map(auctionTuple)
 		};
 	}

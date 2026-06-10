@@ -27,9 +27,9 @@ const DAY = 86_400;
 const HOUR = 3_600;
 
 /** raw points kept this long, then rolled to the next tier */
-export const RAW_WINDOW = 30 * DAY;
+export const RAW_WINDOW = 90 * DAY;
 /** hourly points kept this long, then rolled to daily */
-export const HOURLY_WINDOW = 90 * DAY;
+export const HOURLY_WINDOW = 730 * DAY;
 
 export const STATE_FILES = [
 	{ name: 'bazaar-raw', kind: 'bazaar', tier: 'raw' },

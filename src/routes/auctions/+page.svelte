@@ -55,7 +55,8 @@
 					<th class="py-2 pr-4 font-normal">Rarity</th>
 					<th class="py-2 pr-4 text-right font-normal">Lowest BIN</th>
 					<th class="py-2 pr-4 text-right font-normal">Median BIN</th>
-					<th class="py-2 text-right font-normal">Listings</th>
+					<th class="py-2 pr-4 text-right font-normal">Listings</th>
+					<th class="py-2 text-right font-normal">Discount</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -73,10 +74,17 @@
 						<td class="py-1.5 pr-4 text-right font-mono text-muted tabular-nums"
 							>{formatPrice(row.medianBin)}</td
 						>
-						<td class="py-1.5 text-right font-mono text-muted tabular-nums">{row.count}</td>
+						<td class="py-1.5 pr-4 text-right font-mono text-muted tabular-nums">{row.count}</td>
+						<td
+							class="py-1.5 text-right font-mono tabular-nums {row.discount >= 0.2
+								? 'text-up'
+								: 'text-muted'}"
+							title="lowest BIN vs median BIN — large gaps suggest underpriced listings"
+							>{(row.discount * 100).toFixed(0) + '%'}</td
+						>
 					</tr>
 				{:else}
-					<tr><td colspan="5" class="py-8 text-center text-muted">No items match “{query}”.</td></tr
+					<tr><td colspan="6" class="py-8 text-center text-muted">No items match “{query}”.</td></tr
 					>
 				{/each}
 			</tbody>

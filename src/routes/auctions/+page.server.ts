@@ -11,7 +11,8 @@ export function load() {
 			tier: stats.tier,
 			lowestBin: stats.lowestBin,
 			medianBin: stats.medianBin,
-			count: stats.count
+			count: stats.count,
+			discount: stats.medianBin > 0 ? (stats.medianBin - stats.lowestBin) / stats.medianBin : 0
 		}))
 		.sort((a, b) => b.count - a.count);
 	return { lastUpdated, rows };

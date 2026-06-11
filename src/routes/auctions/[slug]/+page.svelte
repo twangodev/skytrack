@@ -2,6 +2,7 @@
 	import SEO from '$lib/components/SEO.svelte';
 	import LastUpdated from '$lib/components/LastUpdated.svelte';
 	import RarityBadge from '$lib/components/RarityBadge.svelte';
+	import { TrendingDown } from '@lucide/svelte';
 	import StarButton from '$lib/components/StarButton.svelte';
 	import PriceOverview from '$lib/components/PriceOverview.svelte';
 	import { formatPrice, formatCompact } from '$lib/format';
@@ -19,6 +20,12 @@
 		{ label: 'Median BIN', value: formatPrice(data.stats.medianBin), coins: true },
 		{ label: 'Active Listings', value: formatCompact(data.stats.count), coins: false }
 	]);
+
+	const discount = $derived(
+		data.stats.medianBin > 0
+			? (data.stats.medianBin - data.stats.lowestBin) / data.stats.medianBin
+			: 0
+	);
 </script>
 
 <SEO
@@ -63,6 +70,24 @@
 		primary={{ label: 'Lowest BIN', points: data.history.map((h) => [h.t, h.l]) }}
 		secondary={{ label: 'Median BIN', points: data.history.map((h) => [h.t, h.m]) }}
 	/>
+
+	{#if discount >= 0.15}
+		<div
+			class="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-up/40 bg-up/10 px-4 py-3"
+		>
+			<span class="flex items-center gap-2 text-sm font-medium text-up">
+				<TrendingDown size={14} strokeWidth={2} aria-hidden="true" />
+				Underpriced listing
+			</span>
+			<span class="font-mono text-sm text-up tabular-nums">
+				lowest BIN {(discount * 100).toFixed(0)}% under median
+			</span>
+			<span class="text-xs text-muted">
+				{formatPrice(data.stats.lowestBin)} vs {formatPrice(data.stats.medianBin)} median across
+				{data.stats.count} listings, as of the last refresh
+			</span>
+		</div>
+	{/if}
 
 	<dl
 		class="grid grid-cols-1 gap-px overflow-hidden rounded-lg border border-subtle bg-subtle sm:grid-cols-2"

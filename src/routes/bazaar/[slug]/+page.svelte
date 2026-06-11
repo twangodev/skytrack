@@ -6,6 +6,7 @@
 	import RarityBadge from '$lib/components/RarityBadge.svelte';
 	import StarButton from '$lib/components/StarButton.svelte';
 	import DepthChart from '$lib/components/DepthChart.svelte';
+	import FlipCallout from '$lib/components/FlipCallout.svelte';
 	import PriceOverview from '$lib/components/PriceOverview.svelte';
 	import { formatPrice } from '$lib/format';
 	import { breadcrumbSchema, itemPageSchema } from '$lib/schema';
@@ -95,6 +96,8 @@
 		primary={{ label: 'Instabuy', points: instabuy }}
 		secondary={{ label: 'Instasell', points: instasell }}
 	/>
+
+	<FlipCallout qs={snapshot.qs} />
 
 	<QuickStats qs={snapshot.qs} />
 

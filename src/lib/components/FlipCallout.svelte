@@ -2,7 +2,7 @@
 	import NumberFlow from '@number-flow/svelte';
 	import { Repeat } from '@lucide/svelte';
 	import type { BazaarProductSnapshot } from '$lib/market/aggregate';
-	import { flipQuote } from '$lib/market/flips';
+	import { flipQuote, isFlipOpportunity } from '$lib/market/flips';
 	import { formatCompact, formatPrice } from '$lib/format';
 
 	interface Props {
@@ -16,7 +16,7 @@
 	const fillVolume = $derived(Math.min(qs.bmw, qs.smw));
 </script>
 
-{#if quote.profit > 0 && qs.bp > 0 && qs.sp > 0}
+{#if qs.bp > 0 && qs.sp > 0 && isFlipOpportunity(quote, fillVolume)}
 	<a
 		href="/flips"
 		class="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-up/40 bg-up/10 px-4 py-3 transition-colors hover:border-up"

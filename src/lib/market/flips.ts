@@ -16,3 +16,24 @@ export function flipQuote(bp: number, sp: number): FlipQuote {
 	const profit = (bp - TICK) * (1 - BAZAAR_TAX) - buyCost;
 	return { buyCost, profit, marginPct: (profit / buyCost) * 100 };
 }
+
+/**
+ * Nearly every product has a paper-positive spread; wide spreads are exactly
+ * what illiquid books look like. An opportunity worth flagging needs edge
+ * (margin), velocity (weekly fills on the slower leg), and material total
+ * upside. Calibrated against live data: roughly the top fifth of products.
+ */
+export const OPPORTUNITY = {
+	minMarginPct: 2,
+	minWeeklyFills: 50_000,
+	minWeeklyPotential: 50_000_000
+} as const;
+
+export function isFlipOpportunity(quote: FlipQuote, weeklyFills: number): boolean {
+	return (
+		quote.profit > 0 &&
+		quote.marginPct >= OPPORTUNITY.minMarginPct &&
+		weeklyFills >= OPPORTUNITY.minWeeklyFills &&
+		quote.profit * weeklyFills >= OPPORTUNITY.minWeeklyPotential
+	);
+}

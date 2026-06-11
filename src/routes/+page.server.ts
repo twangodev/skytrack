@@ -7,7 +7,7 @@ import {
 } from '$lib/server/data';
 import { slugFromId } from '$lib/slug';
 import { titleCase } from '$lib/format';
-import { flipQuote } from '$lib/market/flips';
+import { flipQuote, isFlipOpportunity } from '$lib/market/flips';
 
 export function load() {
 	const bazaar = loadBazaar();
@@ -83,9 +83,10 @@ export function load() {
 		.map(([id, snap]) => {
 			const { bp, sp, bmw, smw } = snap.qs;
 			if (bp <= 0 || sp <= 0) return null;
-			const { profit, marginPct } = flipQuote(bp, sp);
-			if (profit <= 0) return null;
+			const quote = flipQuote(bp, sp);
 			const volume = Math.min(bmw, smw);
+			if (!isFlipOpportunity(quote, volume)) return null;
+			const { profit, marginPct } = quote;
 			return {
 				id,
 				slug: slugFromId(id),

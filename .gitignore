@@ -1,5 +1,7 @@
 node_modules/
 .svelte-kit/
+.env
+.env.*
 build/
 src/lib/data/*.json
 .idea/

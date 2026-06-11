@@ -2,13 +2,17 @@ name: Build and Deploy
 
 on:
   push:
+  # data refreshes are dispatched every 15m by the skytrack cloudflare worker
+  # (workers/deploy-cron); github's own cron scheduler proved too unreliable
   workflow_dispatch:
-  schedule:
-    - cron: '*/15 * * * *'
+    inputs:
+      data_only:
+        description: Data-only refresh (skip tests and checks)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
-  actions: write # keepalive re-enables the cron via API
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -31,16 +35,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
       # data-only cron runs reuse the code already validated on push
       - name: Test
-        if: github.event_name != 'schedule'
+        if: ${{ !inputs.data_only }}
         run: bun run test
       - name: Check
-        if: github.event_name != 'schedule'
+        if: ${{ !inputs.data_only }}
         run: bun run check
-      - name: Keepalive
-        if: github.event_name == 'schedule'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: bun scripts/keepalive.ts
       - name: Build
         run: bun run build
       - name: Upload Pages Artifact

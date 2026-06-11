@@ -132,7 +132,7 @@
 				</dd>
 			</div>
 			<div class="flex flex-col gap-0.5 bg-surface px-4 py-3">
-				<dt class="text-xs text-muted">Market Today</dt>
+				<dt class="text-xs text-muted">Market 24h</dt>
 				<dd
 					class="font-mono text-sm tabular-nums {indexChange === null
 						? 'text-muted'
@@ -156,7 +156,7 @@
 	{#if data.movers.length > 0}
 		<section class="flex flex-col gap-3">
 			<div class="flex items-baseline justify-between">
-				<h2 class="text-sm font-medium text-muted">Top movers today</h2>
+				<h2 class="text-sm font-medium text-muted">Top movers · 24h</h2>
 				<a href="/movers" class="text-xs text-muted transition-colors hover:text-accent">
 					view all
 				</a>

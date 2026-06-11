@@ -13,13 +13,15 @@ export function load() {
 	const auctions = loadAuctions();
 	const items = loadItems();
 
-	// Top movers: biggest |%Δ| in instabuy across today's snapshots, liquid items only.
-	const startOfToday = Math.floor(Date.parse(new Date().toISOString().slice(0, 10)) / 1000);
+	// Top movers: biggest |%Δ| in instabuy over a rolling 24h, liquid items only.
+	// Rolling rather than calendar-day: a UTC-midnight anchor leaves the whole
+	// dashboard empty for builds in the first minutes of each day.
+	const windowStart = Math.floor(Date.now() / 1000) - 86_400;
 	const movers = Object.entries(bazaar.products)
 		.map(([id, snap]) => {
 			if (snap.qs.bmw < 100_000) return null;
-			// history is chronological; today's points are a suffix
-			const history = bazaarHistory(id).filter((h) => h.t >= startOfToday);
+			// history is chronological; recent points are a suffix
+			const history = bazaarHistory(id).filter((h) => h.t >= windowStart);
 			if (history.length < 2) return null;
 			const first = history[0].b;
 			const last = history[history.length - 1].b;
@@ -37,7 +39,7 @@ export function load() {
 		.sort((a, b) => Math.abs(b.change) - Math.abs(a.change))
 		.slice(0, 6);
 
-	// Market dashboard stats: total weekly volume, 1D breadth, equal-weight index.
+	// Market dashboard stats: total weekly volume, 24h breadth, equal-weight index.
 	let totalWeeklyVolume = 0;
 	let up = 0;
 	let down = 0;
@@ -46,7 +48,7 @@ export function load() {
 	for (const [id, snap] of Object.entries(bazaar.products)) {
 		totalWeeklyVolume += snap.qs.bmw + snap.qs.smw;
 		if (snap.qs.bmw < 100_000) continue;
-		const history = bazaarHistory(id).filter((h) => h.t >= startOfToday);
+		const history = bazaarHistory(id).filter((h) => h.t >= windowStart);
 		if (history.length < 2) continue;
 		const first = history[0].b;
 		if (first <= 0) continue;
@@ -56,7 +58,7 @@ export function load() {
 		liquid.push({ bmw: snap.qs.bmw, history });
 	}
 
-	// Equal-weight index: today's points of the 50 most liquid products, each
+	// Equal-weight index: the window's points of the 50 most liquid products, each
 	// normalized to its first point, averaged per timestamp bucket.
 	const buckets = new Map<number, number[]>();
 	for (const { history } of liquid.sort((a, b) => b.bmw - a.bmw).slice(0, 50)) {

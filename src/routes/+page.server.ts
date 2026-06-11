@@ -7,6 +7,7 @@ import {
 } from '$lib/server/data';
 import { slugFromId } from '$lib/slug';
 import { titleCase } from '$lib/format';
+import { flipQuote } from '$lib/market/flips';
 
 export function load() {
 	const bazaar = loadBazaar();
@@ -77,8 +78,31 @@ export function load() {
 		)
 		.sort((a, b) => a[0] - b[0]);
 
+	// Top flips: best buy-order to sell-offer opportunities by weekly potential.
+	const flips = Object.entries(bazaar.products)
+		.map(([id, snap]) => {
+			const { bp, sp, bmw, smw } = snap.qs;
+			if (bp <= 0 || sp <= 0) return null;
+			const { profit, marginPct } = flipQuote(bp, sp);
+			if (profit <= 0) return null;
+			const volume = Math.min(bmw, smw);
+			return {
+				id,
+				slug: slugFromId(id),
+				name: items[id]?.name ?? titleCase(id),
+				profit,
+				marginPct,
+				volume,
+				weeklyPotential: profit * volume
+			};
+		})
+		.filter((f) => f !== null)
+		.sort((a, b) => b.weeklyPotential - a.weeklyPotential)
+		.slice(0, 3);
+
 	return {
 		movers,
+		flips,
 		totalWeeklyVolume,
 		breadth: { up, down },
 		index,

@@ -153,6 +153,36 @@
 		{/if}
 	</section>
 
+	{#if data.flips.length > 0}
+		<section class="flex flex-col gap-3">
+			<div class="flex items-baseline justify-between">
+				<h2 class="text-sm font-medium text-muted">Top flips</h2>
+				<a href="/flips" class="text-xs text-muted transition-colors hover:text-accent">
+					view all
+				</a>
+			</div>
+			<div class="grid gap-3 sm:grid-cols-3">
+				{#each data.flips as flip (flip.id)}
+					<a
+						href="/bazaar/{flip.slug}"
+						class="flex flex-col gap-1 rounded-lg border border-subtle bg-surface px-4 py-3 transition-colors hover:border-accent"
+					>
+						<span class="truncate text-sm">{flip.name}</span>
+						<span class="flex items-baseline justify-between gap-2">
+							<span class="font-mono text-sm text-up tabular-nums">
+								+{formatPrice(flip.profit)}/item
+							</span>
+							<span class="font-mono text-xs text-muted tabular-nums">
+								{flip.marginPct.toFixed(1)}%
+							</span>
+						</span>
+						<span class="text-xs text-muted">fills about {formatCompact(flip.volume)}/week</span>
+					</a>
+				{/each}
+			</div>
+		</section>
+	{/if}
+
 	{#if data.movers.length > 0}
 		<section class="flex flex-col gap-3">
 			<div class="flex items-baseline justify-between">

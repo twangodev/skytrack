@@ -10,6 +10,10 @@ export const GET: RequestHandler = () => {
 		'/',
 		'/bazaar',
 		'/auctions',
+		'/flips',
+		'/movers',
+		'/compare',
+		'/docs',
 		...[...bazaarSlugMap().keys()].map((slug) => `/bazaar/${slug}`),
 		...[...auctionSlugMap().keys()].map((slug) => `/auctions/${slug}`)
 	];

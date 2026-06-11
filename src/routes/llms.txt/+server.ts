@@ -30,6 +30,14 @@ Data last refreshed: ${updated}
 
 Every item page embeds current prices in its HTML and JSON-LD, so no JavaScript is required to read them.
 
+## Machine-readable API
+
+- Markdown summary of any item: ${site.url}/bazaar/{slug}.md or ${site.url}/auctions/{slug}.md
+- Price history JSON (15-min raw, hourly, daily tiers): ${site.url}/data/items/{slug}.json
+- Item directory JSON: ${site.url}/search-index.json
+- OpenAPI 3.1 spec: ${site.url}/openapi.json
+- Human-readable docs: ${site.url}/docs
+
 ## Full item directory with current prices
 
 ${site.url}/llms-full.txt

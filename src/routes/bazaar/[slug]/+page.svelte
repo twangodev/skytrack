@@ -55,6 +55,7 @@
 	title={`${data.name} Bazaar Price`}
 	{description}
 	canonical={`/bazaar/${data.slug}`}
+	markdown={`/bazaar/${data.slug}.md`}
 	jsonLd={[
 		itemPageSchema({
 			name: `${data.name} Hypixel Skyblock Bazaar Price`,

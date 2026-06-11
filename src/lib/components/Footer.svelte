@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Braces } from '@lucide/svelte';
 	import { SiGithub } from '@icons-pack/svelte-simple-icons';
 	import { site } from '$lib/config';
 </script>
@@ -15,6 +16,14 @@
 		>.
 	</p>
 	<div class="flex items-center gap-3">
+		<a
+			href="/docs"
+			title="API documentation"
+			aria-label="API documentation"
+			class="transition-colors hover:text-text"
+		>
+			<Braces size={14} strokeWidth={1.5} />
+		</a>
 		<a
 			href={site.repo}
 			title="Source on GitHub"

@@ -25,6 +25,7 @@
 	title={`${data.name} Auction Price`}
 	{description}
 	canonical={`/auctions/${data.slug}`}
+	markdown={`/auctions/${data.slug}.md`}
 	jsonLd={[
 		itemPageSchema({
 			name: `${data.name} Hypixel Skyblock Auction Price`,

@@ -5,10 +5,12 @@
 		title?: string;
 		description?: string;
 		canonical?: `/${string}` | '/';
+		/** markdown alternate of this page */
+		markdown?: `/${string}`;
 		jsonLd?: object | object[];
 	}
 
-	const { title, description = site.description, canonical, jsonLd }: Props = $props();
+	const { title, description = site.description, canonical, markdown, jsonLd }: Props = $props();
 
 	const fullTitle = $derived(title ? `${title} · ${site.title}` : site.title);
 
@@ -21,6 +23,9 @@
 	{#if canonical}
 		<link rel="canonical" href="{site.url}{canonical === '/' ? '' : canonical}" />
 		<meta property="og:url" content="{site.url}{canonical === '/' ? '' : canonical}" />
+	{/if}
+	{#if markdown}
+		<link rel="alternate" type="text/markdown" href="{site.url}{markdown}" />
 	{/if}
 	<meta property="og:site_name" content={site.title} />
 	<meta property="og:title" content={fullTitle} />

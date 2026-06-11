@@ -5,23 +5,25 @@
 		candles: Candle[];
 		/** bucket width in seconds - drives candle body width on the time axis */
 		bucketSeconds: number;
+		/** fixed [start, end] unix-seconds window; defaults to the candle extent */
+		window?: [number, number];
 	}
 
-	const { candles, bucketSeconds }: Props = $props();
+	const { candles, bucketSeconds, window }: Props = $props();
 
 	const W = 600;
 	const PLOT_H = 200;
 
 	// x: time-scaled so gaps in the data render as gaps; each candle occupies
-	// its bucket [t, t + bucketSeconds)
+	// its bucket [t, t + bucketSeconds). A fixed window keeps the axis a
+	// continuous rolling period instead of stretching the data extent.
+	const xStart = $derived(window?.[0] ?? candles[0]?.t ?? 0);
 	const span = $derived.by(() => {
+		if (window) return Math.max(1, window[1] - window[0]);
 		if (candles.length === 0) return 1;
 		return candles[candles.length - 1].t + bucketSeconds - candles[0].t;
 	});
-	const x = $derived.by(() => {
-		const start = candles[0]?.t ?? 0;
-		return (t: number) => ((t - start) / span) * W;
-	});
+	const x = $derived((t: number) => ((t - xStart) / span) * W);
 	const bodyW = $derived(Math.min(18, Math.max(2, (bucketSeconds / span) * W * 0.65)));
 
 	// y domain: [min low, max high] padded 4%
@@ -89,8 +91,8 @@
 			{/each}
 		</svg>
 		<div class="flex justify-between pt-1 font-mono text-[10px] text-muted" aria-hidden="true">
-			<span>{label(candles[0].t)}</span>
-			<span>{label(candles[candles.length - 1].t)}</span>
+			<span>{label(window?.[0] ?? candles[0].t)}</span>
+			<span>{label(window?.[1] ?? candles[candles.length - 1].t)}</span>
 		</div>
 	</div>
 {/if}

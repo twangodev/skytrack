@@ -104,6 +104,17 @@
 	const visibleSecondary = $derived(clip(secondaryPoints, effectiveRangeSeconds));
 	const candles = $derived(style === 'candles' ? bucketOHLC(visible, candleBucket) : []);
 
+	// fixed rolling window for the x axis: a 1D chart spans a continuous 24h
+	// ending now, with the line covering only the span that has data - not
+	// the data extent stretched across the full width. ALL keeps auto extent.
+	const xWindow = $derived.by((): [number, number] | undefined => {
+		if (effectiveRangeSeconds === Infinity) return undefined;
+		// anchor to the newest point (live tail keeps this at "now" on bazaar
+		// pages); a stale auctions snapshot still gets an honest full window
+		const end = Math.max(visible[visible.length - 1]?.[0] ?? 0, Math.floor(Date.now() / 1000));
+		return [end - effectiveRangeSeconds, end];
+	});
+
 	const open = $derived(visible[0]?.[1] ?? current);
 	const change = $derived(current - open);
 	const changePct = $derived(open > 0 ? (change / open) * 100 : 0);
@@ -175,7 +186,7 @@
 		</p>
 	{:else if style === 'candles'}
 		<div class="h-[220px] w-full">
-			<CandleChart {candles} bucketSeconds={candleBucket} />
+			<CandleChart {candles} bucketSeconds={candleBucket} window={xWindow} />
 		</div>
 	{:else}
 		<div class="h-[220px] w-full font-mono text-[10px]">
@@ -183,6 +194,7 @@
 				{data}
 				x="date"
 				xScale={scaleTime()}
+				xDomain={xWindow ? [new Date(xWindow[0] * 1000), new Date(xWindow[1] * 1000)] : undefined}
 				y={(d: Row) => d.primary}
 				yNice
 				padding={{ bottom: 4 }}

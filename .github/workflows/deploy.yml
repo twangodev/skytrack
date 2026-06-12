@@ -2,7 +2,7 @@ name: Build and Deploy
 
 on:
   push:
-  # data refreshes are dispatched every 15m by the skytrack cloudflare worker
+  # data refreshes are dispatched every 5m by the skytrack cloudflare worker
   # (workers/deploy-cron); github's own cron scheduler proved too unreliable
   workflow_dispatch:
     inputs:

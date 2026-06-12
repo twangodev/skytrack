@@ -2,7 +2,9 @@
 	import { Search } from '@lucide/svelte';
 	import SEO from '$lib/components/SEO.svelte';
 	import LastUpdated from '$lib/components/LastUpdated.svelte';
+	import Pagination from '$lib/components/Pagination.svelte';
 	import RarityBadge from '$lib/components/RarityBadge.svelte';
+	import Sparkline from '$lib/components/Sparkline.svelte';
 	import { formatPrice } from '$lib/format';
 	import { breadcrumbSchema } from '$lib/schema';
 	import { site } from '$lib/config';
@@ -10,12 +12,15 @@
 	const { data } = $props();
 
 	let query = $state('');
+	let page = $state(1);
+	const pageSize = 100;
 
 	const filtered = $derived(
 		query.length < 2
 			? data.rows
 			: data.rows.filter((row) => row.name.toLowerCase().includes(query.toLowerCase()))
 	);
+	const paged = $derived(filtered.slice((page - 1) * pageSize, page * pageSize));
 </script>
 
 <SEO
@@ -41,7 +46,13 @@
 			<input
 				type="search"
 				placeholder="Filter items…"
-				bind:value={query}
+				bind:value={
+					() => query,
+					(v) => {
+						query = v;
+						page = 1;
+					}
+				}
 				class="w-48 bg-transparent text-sm outline-none placeholder:text-muted"
 			/>
 		</label>
@@ -56,11 +67,12 @@
 					<th class="py-2 pr-4 text-right font-normal">Lowest BIN</th>
 					<th class="py-2 pr-4 text-right font-normal">Median BIN</th>
 					<th class="py-2 pr-4 text-right font-normal">Listings</th>
-					<th class="py-2 text-right font-normal">Discount</th>
+					<th class="py-2 pr-4 text-right font-normal">Discount</th>
+					<th class="py-2 text-right font-normal">7d</th>
 				</tr>
 			</thead>
 			<tbody>
-				{#each filtered as row (row.id)}
+				{#each paged as row (row.id)}
 					<tr class="border-b border-subtle/60 transition-colors hover:bg-surface">
 						<td class="py-1.5 pr-4">
 							<a href="/auctions/{row.slug}" class="transition-colors hover:text-accent">
@@ -76,18 +88,31 @@
 						>
 						<td class="py-1.5 pr-4 text-right font-mono text-muted tabular-nums">{row.count}</td>
 						<td
-							class="py-1.5 text-right font-mono tabular-nums {row.discount >= 0.2
+							class="py-1.5 pr-4 text-right font-mono tabular-nums {row.discount >= 0.2
 								? 'text-up'
 								: 'text-muted'}"
 							title="lowest BIN vs median BIN; large gaps suggest underpriced listings"
 							>{(row.discount * 100).toFixed(0) + '%'}</td
 						>
+						<td class="py-1.5">
+							{#if row.spark.length >= 2}
+								<div
+									class="ml-auto h-8 w-24 {row.spark[row.spark.length - 1] > row.spark[0]
+										? 'text-up'
+										: 'text-down'}"
+								>
+									<Sparkline points={row.spark.map((v, i) => [i, v] as [number, number])} />
+								</div>
+							{/if}
+						</td>
 					</tr>
 				{:else}
-					<tr><td colspan="6" class="py-8 text-center text-muted">No items match “{query}”.</td></tr
+					<tr><td colspan="7" class="py-8 text-center text-muted">No items match “{query}”.</td></tr
 					>
 				{/each}
 			</tbody>
 		</table>
 	</div>
+
+	<Pagination bind:page {pageSize} total={filtered.length} />
 </div>

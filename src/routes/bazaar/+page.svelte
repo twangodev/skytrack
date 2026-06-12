@@ -2,6 +2,8 @@
 	import { Search } from '@lucide/svelte';
 	import SEO from '$lib/components/SEO.svelte';
 	import LastUpdated from '$lib/components/LastUpdated.svelte';
+	import Pagination from '$lib/components/Pagination.svelte';
+	import Sparkline from '$lib/components/Sparkline.svelte';
 	import { formatCompact, formatPrice } from '$lib/format';
 	import { breadcrumbSchema } from '$lib/schema';
 	import { site } from '$lib/config';
@@ -9,12 +11,15 @@
 	const { data } = $props();
 
 	let query = $state('');
+	let page = $state(1);
+	const pageSize = 100;
 
 	const filtered = $derived(
 		query.length < 2
 			? data.rows
 			: data.rows.filter((row) => row.name.toLowerCase().includes(query.toLowerCase()))
 	);
+	const paged = $derived(filtered.slice((page - 1) * pageSize, page * pageSize));
 </script>
 
 <SEO
@@ -40,7 +45,11 @@
 			<input
 				type="search"
 				placeholder="Filter products…"
-				bind:value={query}
+				value={query}
+				oninput={(e) => {
+					query = e.currentTarget.value;
+					page = 1;
+				}}
 				class="w-48 bg-transparent text-sm outline-none placeholder:text-muted"
 			/>
 		</label>
@@ -55,11 +64,12 @@
 					<th class="py-2 pr-4 text-right font-normal">Sell Price</th>
 					<th class="py-2 pr-4 text-right font-normal">Weekly Buys</th>
 					<th class="py-2 pr-4 text-right font-normal">Weekly Sells</th>
-					<th class="py-2 text-right font-normal">Pressure</th>
+					<th class="py-2 pr-4 text-right font-normal">Pressure</th>
+					<th class="py-2 text-right font-normal">7d</th>
 				</tr>
 			</thead>
 			<tbody>
-				{#each filtered as row (row.id)}
+				{#each paged as row (row.id)}
 					<tr class="border-b border-subtle/60 transition-colors hover:bg-surface">
 						<td class="py-1.5 pr-4">
 							<a href="/bazaar/{row.slug}" class="transition-colors hover:text-accent">
@@ -75,7 +85,7 @@
 							>{formatCompact(row.smw)}</td
 						>
 						<td
-							class="py-1.5 text-right font-mono tabular-nums {row.demandShare > 0.55
+							class="py-1.5 pr-4 text-right font-mono tabular-nums {row.demandShare > 0.55
 								? 'text-up'
 								: row.demandShare < 0.45
 									? 'text-down'
@@ -83,14 +93,27 @@
 							title="share of order-book volume on the demand side"
 							>{Math.round(row.demandShare * 100) + '%'}</td
 						>
+						<td class="py-1.5">
+							{#if row.spark.length > 0}
+								<div
+									class="ml-auto h-8 w-24 {row.spark[row.spark.length - 1] > row.spark[0]
+										? 'text-up'
+										: 'text-down'}"
+								>
+									<Sparkline points={row.spark.map((v, i) => [i, v] as [number, number])} />
+								</div>
+							{/if}
+						</td>
 					</tr>
 				{:else}
 					<tr
-						><td colspan="6" class="py-8 text-center text-muted">No products match “{query}”.</td
+						><td colspan="7" class="py-8 text-center text-muted">No products match “{query}”.</td
 						></tr
 					>
 				{/each}
 			</tbody>
 		</table>
 	</div>
+
+	<Pagination bind:page pageSize={100} total={filtered.length} />
 </div>

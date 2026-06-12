@@ -1,4 +1,5 @@
-import { loadAuctions } from '$lib/server/data';
+import { auctionHistory, loadAuctions } from '$lib/server/data';
+import { spark7d } from '$lib/server/spark';
 import { slugFromId } from '$lib/slug';
 
 export function load() {
@@ -12,7 +13,8 @@ export function load() {
 			lowestBin: stats.lowestBin,
 			medianBin: stats.medianBin,
 			count: stats.count,
-			discount: stats.medianBin > 0 ? (stats.medianBin - stats.lowestBin) / stats.medianBin : 0
+			discount: stats.medianBin > 0 ? (stats.medianBin - stats.lowestBin) / stats.medianBin : 0,
+			spark: spark7d(auctionHistory(id).map((h) => [h.t, h.m] as [number, number]))
 		}))
 		.sort((a, b) => b.count - a.count);
 	return { lastUpdated, rows };

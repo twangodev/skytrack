@@ -17,10 +17,17 @@ export function bucketOHLC(points: [t: number, v: number][], bucketSeconds: numb
 	return candles;
 }
 
-/** Candle width that keeps a sensible number of candles for the visible range. */
+/**
+ * Candle width that keeps a dense-but-readable count for the visible range.
+ * Each tier stays at or above the underlying source resolution so candles never
+ * collapse to one-point ticks: raw points land at the 5-min refresh cadence
+ * (older history is 15-min from the previous schedule), the bazaar hourly
+ * tier is 4h-decimated, and the daily tiers are 1d. The ~288-360 candle counts
+ * below all draw from data at least that dense for their range.
+ */
 export function pickBucket(rangeSeconds: number): number {
-	if (rangeSeconds <= 86_400) return 3600; // 1h
-	if (rangeSeconds <= 604_800) return 14_400; // 4h
-	if (rangeSeconds <= 2_592_000) return 86_400; // 1D
-	return 86_400 * 7; // 1W
+	if (rangeSeconds <= 86_400) return 300; // 5m (~288 candles, matches raw cadence)
+	if (rangeSeconds <= 604_800) return 1800; // 30m (~336 candles)
+	if (rangeSeconds <= 2_592_000) return 7200; // 2h (~360 candles)
+	return 86_400; // 1D
 }

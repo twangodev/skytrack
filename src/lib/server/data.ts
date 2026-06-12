@@ -63,7 +63,7 @@ const tail = <P extends { t: number }>(points: P[], windowSeconds: number): P[] 
 	return points.filter((p) => p.t >= newest - windowSeconds);
 };
 
-/** Full raw-tier series (15-min points, trailing ~30d) for windowed computations. */
+/** Full raw-tier series (one point per refresh, ~5-min cadence) for windowed computations. */
 export function bazaarRaw(productId: string): BazaarHistoryPoint[] {
 	return loadTier<BazaarPoint>('bazaar-raw').get(productId) ?? [];
 }

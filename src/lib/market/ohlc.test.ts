@@ -49,23 +49,23 @@ describe('bucketOHLC', () => {
 });
 
 describe('pickBucket', () => {
-	test('≤ 1 day → 1h candles', () => {
-		expect(pickBucket(3600)).toBe(3600);
-		expect(pickBucket(86_400)).toBe(3600);
+	test('≤ 1 day → 5m candles', () => {
+		expect(pickBucket(3600)).toBe(300);
+		expect(pickBucket(86_400)).toBe(300);
 	});
 
-	test('≤ 1 week → 4h candles', () => {
-		expect(pickBucket(86_401)).toBe(14_400);
-		expect(pickBucket(604_800)).toBe(14_400);
+	test('≤ 1 week → 30m candles', () => {
+		expect(pickBucket(86_401)).toBe(1800);
+		expect(pickBucket(604_800)).toBe(1800);
 	});
 
-	test('≤ 30 days → 1D candles', () => {
-		expect(pickBucket(604_801)).toBe(86_400);
-		expect(pickBucket(2_592_000)).toBe(86_400);
+	test('≤ 30 days → 2h candles', () => {
+		expect(pickBucket(604_801)).toBe(7200);
+		expect(pickBucket(2_592_000)).toBe(7200);
 	});
 
-	test('beyond 30 days → 1W candles', () => {
-		expect(pickBucket(2_592_001)).toBe(86_400 * 7);
-		expect(pickBucket(Infinity)).toBe(86_400 * 7);
+	test('beyond 30 days → 1D candles', () => {
+		expect(pickBucket(2_592_001)).toBe(86_400);
+		expect(pickBucket(Infinity)).toBe(86_400);
 	});
 });

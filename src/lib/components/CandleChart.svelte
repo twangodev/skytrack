@@ -24,7 +24,7 @@
 		return candles[candles.length - 1].t + bucketSeconds - candles[0].t;
 	});
 	const x = $derived((t: number) => ((t - xStart) / span) * W);
-	const bodyW = $derived(Math.min(18, Math.max(2, (bucketSeconds / span) * W * 0.65)));
+	const bodyW = $derived(Math.min(18, Math.max(1, (bucketSeconds / span) * W * 0.65)));
 
 	// y domain: [min low, max high] padded 4%
 	const domain = $derived.by((): [number, number] => {

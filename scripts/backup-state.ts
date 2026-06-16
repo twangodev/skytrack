@@ -37,12 +37,24 @@ async function gh<T>(url: string, init: RequestInit = {}): Promise<T> {
 
 interface Release {
 	id: number;
+	name: string;
 	assets: { id: number; name: string }[];
 }
 
-async function ensureRelease(): Promise<Release> {
+const releaseName = (date: string) => `Market history backups - updated ${date}`;
+
+async function updateReleaseName(release: Release, date: string): Promise<Release> {
+	const name = releaseName(date);
+	if (release.name === name) return release;
+	return await gh<Release>(`${API}/releases/${release.id}`, {
+		method: 'PATCH',
+		body: JSON.stringify({ name })
+	});
+}
+
+async function ensureRelease(date: string): Promise<Release> {
 	try {
-		return await gh<Release>(`${API}/releases/tags/${TAG}`);
+		return await updateReleaseName(await gh<Release>(`${API}/releases/tags/${TAG}`), date);
 	} catch (error) {
 		// only a missing release warrants creating one - auth/rate-limit/5xx
 		// failures must surface, not cascade into a confusing create attempt
@@ -52,7 +64,7 @@ async function ensureRelease(): Promise<Release> {
 			method: 'POST',
 			body: JSON.stringify({
 				tag_name: TAG,
-				name: 'History backups',
+				name: releaseName(date),
 				body: 'Rolling weekly backups of the deployment-carried market history. Restore: download the newest date’s files into static/data/state/ (dropping the date prefix) and run the pipeline.',
 				make_latest: 'false'
 			})
@@ -78,7 +90,7 @@ async function main() {
 	}
 
 	// 2. upload date-prefixed assets (replacing same-day reruns)
-	const release = await ensureRelease();
+	const release = await ensureRelease(date);
 	for (const { name, bytes } of files) {
 		const assetName = `${date}-${name}.binpb`;
 		const existing = release.assets.find((a) => a.name === assetName);

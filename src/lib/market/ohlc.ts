@@ -17,17 +17,36 @@ export function bucketOHLC(points: [t: number, v: number][], bucketSeconds: numb
 	return candles;
 }
 
+/** "Nice" candle widths in seconds, ascending. Floors at the 5m source cadence. */
+const BUCKET_LADDER = [
+	300, // 5m
+	900, // 15m
+	1800, // 30m
+	3600, // 1h
+	7200, // 2h
+	14_400, // 4h
+	21_600, // 6h
+	43_200, // 12h
+	86_400, // 1d
+	259_200, // 3d
+	604_800 // 1w
+];
+
+/** Aim for at most this many candles across the visible range. */
+export const TARGET_CANDLES = 50;
+
 /**
- * Candle width that keeps a dense-but-readable count for the visible range.
- * Each tier stays at or above the underlying source resolution so candles never
- * collapse to one-point ticks: raw points land at the 5-min refresh cadence
- * (older history is 15-min from the previous schedule), the bazaar hourly
- * tier is 4h-decimated, and the daily tiers are 1d. The ~288-360 candle counts
- * below all draw from data at least that dense for their range.
+ * Smallest "nice" bucket that keeps the visible range at or under `targetCandles`
+ * candles. Targeting a count (rather than a fixed per-range width) keeps each
+ * candle aggregating several samples instead of collapsing to a single source
+ * tick — at the ~5-min refresh cadence, a 1D view becomes ~48 thirty-minute
+ * candles rather than 288 one-point ticks. Floors at 5m, caps at 1w; pass the
+ * real data span (not Infinity) for the ALL range so the target actually binds.
  */
-export function pickBucket(rangeSeconds: number): number {
-	if (rangeSeconds <= 86_400) return 300; // 5m (~288 candles, matches raw cadence)
-	if (rangeSeconds <= 604_800) return 1800; // 30m (~336 candles)
-	if (rangeSeconds <= 2_592_000) return 7200; // 2h (~360 candles)
-	return 86_400; // 1D
+export function pickBucket(rangeSeconds: number, targetCandles = TARGET_CANDLES): number {
+	const minWidth = rangeSeconds / targetCandles;
+	for (const w of BUCKET_LADDER) {
+		if (w >= minWidth) return w;
+	}
+	return BUCKET_LADDER[BUCKET_LADDER.length - 1];
 }

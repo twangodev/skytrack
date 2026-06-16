@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { bucketOHLC, pickBucket } from './ohlc';
+import { bucketOHLC, pickBucket, TARGET_CANDLES } from './ohlc';
 
 describe('bucketOHLC', () => {
 	test('single bucket: o=first, c=last, h=max, l=min', () => {
@@ -49,23 +49,28 @@ describe('bucketOHLC', () => {
 });
 
 describe('pickBucket', () => {
-	test('≤ 1 day → 5m candles', () => {
-		expect(pickBucket(3600)).toBe(300);
-		expect(pickBucket(86_400)).toBe(300);
+	test('keeps the visible range at or under the target candle count', () => {
+		for (const range of [86_400, 7 * 86_400, 30 * 86_400, 90 * 86_400]) {
+			expect(range / pickBucket(range)).toBeLessThanOrEqual(TARGET_CANDLES);
+		}
 	});
 
-	test('≤ 1 week → 30m candles', () => {
-		expect(pickBucket(86_401)).toBe(1800);
-		expect(pickBucket(604_800)).toBe(1800);
+	test('picks the smallest nice bucket that meets the target', () => {
+		expect(pickBucket(86_400)).toBe(1800); // 1D → 30m (~48 candles), not 1h (~24)
+		expect(pickBucket(7 * 86_400)).toBe(14_400); // 1W → 4h (~42 candles)
+		expect(pickBucket(30 * 86_400)).toBe(86_400); // 1M → 1d (~30 candles)
 	});
 
-	test('≤ 30 days → 2h candles', () => {
-		expect(pickBucket(604_801)).toBe(7200);
-		expect(pickBucket(2_592_000)).toBe(7200);
+	test('never buckets below the 5m source cadence', () => {
+		expect(pickBucket(60)).toBe(300);
+		expect(pickBucket(3600)).toBeGreaterThanOrEqual(300);
 	});
 
-	test('beyond 30 days → 1D candles', () => {
-		expect(pickBucket(2_592_001)).toBe(86_400);
-		expect(pickBucket(Infinity)).toBe(86_400);
+	test('Infinity falls back to the coarsest bucket', () => {
+		expect(pickBucket(Infinity)).toBe(604_800);
+	});
+
+	test('honors a custom target count', () => {
+		expect(pickBucket(86_400, 24)).toBe(3600); // target 24 → 1D lands on 1h
 	});
 });

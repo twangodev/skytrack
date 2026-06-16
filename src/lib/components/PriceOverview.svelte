@@ -98,10 +98,17 @@
 		clip(primaryPoints, selectedRangeSeconds).length >= 2 ? selectedRangeSeconds : Infinity
 	);
 	const widened = $derived(effectiveRangeSeconds !== selectedRangeSeconds);
-	const candleBucket = $derived(pickBucket(effectiveRangeSeconds));
 
 	const visible = $derived(clip(primaryPoints, effectiveRangeSeconds));
 	const visibleSecondary = $derived(clip(secondaryPoints, effectiveRangeSeconds));
+	// ALL has no fixed range — target the candle count off the real data extent
+	// so buckets don't collapse to a single 1w slot on short histories
+	const candleSpan = $derived(
+		effectiveRangeSeconds !== Infinity || visible.length < 2
+			? effectiveRangeSeconds
+			: visible[visible.length - 1][0] - visible[0][0]
+	);
+	const candleBucket = $derived(pickBucket(candleSpan));
 	const candles = $derived(style === 'candles' ? bucketOHLC(visible, candleBucket) : []);
 
 	// fixed rolling window for the x axis: a 1D chart spans a continuous 24h

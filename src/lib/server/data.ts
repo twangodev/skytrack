@@ -81,8 +81,29 @@ export function bazaarHistory(productId: string): BazaarHistoryPoint[] {
 	return [...daily, ...tail(hourly, 7 * DAY), ...tail(raw, DAY)].sort((a, b) => a.t - b.t);
 }
 
+/**
+ * Full archive (all tiers, no cap) for server-side summaries; not embedded
+ * into the page payload. Returned unsorted - summarizeHistory sorts once.
+ */
+export function bazaarSummaryHistory(productId: string): BazaarHistoryPoint[] {
+	const daily = loadTier<BazaarPoint>('bazaar-daily').get(productId) ?? [];
+	const hourly = loadTier<BazaarPoint>('bazaar-hourly').get(productId) ?? [];
+	const raw = loadTier<BazaarPoint>('bazaar-raw').get(productId) ?? [];
+	return [...daily, ...hourly, ...raw];
+}
+
 export function auctionHistory(itemId: string): AuctionHistoryPoint[] {
 	const daily = loadTier<AuctionPoint>('auctions-daily').get(itemId) ?? [];
 	const raw = loadTier<AuctionPoint>('auctions-raw').get(itemId) ?? [];
 	return [...daily, ...tail(raw, 7 * DAY)].sort((a, b) => a.t - b.t);
+}
+
+/**
+ * Full archive (all tiers, no cap) for server-side summaries; not embedded
+ * into the page payload. Returned unsorted - summarizeHistory sorts once.
+ */
+export function auctionSummaryHistory(itemId: string): AuctionHistoryPoint[] {
+	const daily = loadTier<AuctionPoint>('auctions-daily').get(itemId) ?? [];
+	const raw = loadTier<AuctionPoint>('auctions-raw').get(itemId) ?? [];
+	return [...daily, ...raw];
 }

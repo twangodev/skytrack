@@ -8,8 +8,9 @@
 	import DepthChart from '$lib/components/DepthChart.svelte';
 	import FlipCallout from '$lib/components/FlipCallout.svelte';
 	import PriceOverview from '$lib/components/PriceOverview.svelte';
+	import HistorySummary from '$lib/components/HistorySummary.svelte';
 	import { formatPrice } from '$lib/format';
-	import { breadcrumbSchema, itemPageSchema } from '$lib/schema';
+	import { breadcrumbSchema, itemPageSchema, priceHistoryDatasetSchema } from '$lib/schema';
 	import { site } from '$lib/config';
 	import { LiveBazaar } from '$lib/hypixel/live.svelte';
 	import { toSnapshot } from '$lib/market/aggregate';
@@ -47,22 +48,41 @@
 	});
 
 	const description = $derived(
-		`${data.name} bazaar prices on Hypixel Skyblock: instabuy ${formatPrice(snapshot.qs.bp)} coins, ` +
-			`instasell ${formatPrice(snapshot.qs.sp)} coins. Live order book, market depth, and price history.`
+		`${data.name} bazaar price history on Hypixel Skyblock: instabuy ${formatPrice(snapshot.qs.bp)} coins, ` +
+			`instasell ${formatPrice(snapshot.qs.sp)} coins. Live order book, market depth, and historical price chart.`
+	);
+	const temporalCoverage = $derived(
+		data.summary
+			? `${new Date(data.summary.firstTracked * 1000).toISOString()}/${new Date(data.summary.lastTracked * 1000).toISOString()}`
+			: undefined
 	);
 </script>
 
 <SEO
-	title={`${data.name} Bazaar Price`}
+	title={`${data.name} Bazaar Price History`}
 	{description}
 	canonical={`/bazaar/${data.slug}`}
 	markdown={`/bazaar/${data.slug}.md`}
 	jsonLd={[
 		itemPageSchema({
-			name: `${data.name} Hypixel Skyblock Bazaar Price`,
+			name: `${data.name} Hypixel Skyblock Bazaar Price History`,
 			url: `${site.url}/bazaar/${data.slug}`,
 			description
 		}),
+		...(data.summary
+			? [
+					priceHistoryDatasetSchema({
+						name: `${data.name} Hypixel Skyblock Bazaar Price History`,
+						url: `${site.url}/bazaar/${data.slug}`,
+						description,
+						dataUrl: `${site.url}/data/items/${data.slug}.json`,
+						markdownUrl: `${site.url}/bazaar/${data.slug}.md`,
+						dateModified: new Date(data.lastUpdated).toISOString(),
+						variables: ['instabuy price', 'instasell price'],
+						temporalCoverage
+					})
+				]
+			: []),
 		breadcrumbSchema([
 			{ name: site.title, url: site.url },
 			{ name: 'Bazaar', url: `${site.url}/bazaar` },
@@ -78,7 +98,7 @@
 			<span aria-hidden="true"> / </span>
 		</nav>
 		<div class="mt-1 flex flex-wrap items-baseline gap-3">
-			<h1 class="text-2xl font-medium">{data.name}</h1>
+			<h1 class="text-2xl font-medium">{data.name} Bazaar Price History</h1>
 			{#if data.tier}
 				<RarityBadge tier={data.tier} />
 			{/if}
@@ -95,6 +115,16 @@
 		kind="bazaar"
 		primary={{ label: 'Instabuy', points: instabuy }}
 		secondary={{ label: 'Instasell', points: instasell }}
+	/>
+
+	<HistorySummary
+		itemName={data.name}
+		marketLabel="bazaar"
+		metricLabel="instabuy"
+		secondaryMetricLabel="instasell"
+		summary={data.summary}
+		dataUrl={`/data/items/${data.slug}.json`}
+		markdownUrl={`/bazaar/${data.slug}.md`}
 	/>
 
 	<FlipCallout qs={snapshot.qs} />

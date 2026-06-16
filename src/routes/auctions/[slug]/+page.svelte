@@ -5,15 +5,21 @@
 	import { TrendingDown } from '@lucide/svelte';
 	import StarButton from '$lib/components/StarButton.svelte';
 	import PriceOverview from '$lib/components/PriceOverview.svelte';
+	import HistorySummary from '$lib/components/HistorySummary.svelte';
 	import { formatPrice, formatCompact } from '$lib/format';
-	import { breadcrumbSchema, itemPageSchema } from '$lib/schema';
+	import { breadcrumbSchema, itemPageSchema, priceHistoryDatasetSchema } from '$lib/schema';
 	import { site } from '$lib/config';
 
 	const { data } = $props();
 
 	const description = $derived(
-		`${data.name} is worth ${formatPrice(data.stats.lowestBin)} coins (lowest BIN) on the Hypixel ` +
-			`Skyblock auction house, with a median BIN of ${formatPrice(data.stats.medianBin)} across ${data.stats.count} active listings.`
+		`${data.name} lowest BIN price history on the Hypixel Skyblock auction house: current lowest BIN ` +
+			`${formatPrice(data.stats.lowestBin)} coins, median BIN ${formatPrice(data.stats.medianBin)} coins across ${data.stats.count} active listings.`
+	);
+	const temporalCoverage = $derived(
+		data.summary
+			? `${new Date(data.summary.firstTracked * 1000).toISOString()}/${new Date(data.summary.lastTracked * 1000).toISOString()}`
+			: undefined
 	);
 
 	const cells = $derived([
@@ -29,16 +35,30 @@
 </script>
 
 <SEO
-	title={`${data.name} Auction Price`}
+	title={`${data.name} Auction Price History`}
 	{description}
 	canonical={`/auctions/${data.slug}`}
 	markdown={`/auctions/${data.slug}.md`}
 	jsonLd={[
 		itemPageSchema({
-			name: `${data.name} Hypixel Skyblock Auction Price`,
+			name: `${data.name} Hypixel Skyblock Auction Price History`,
 			url: `${site.url}/auctions/${data.slug}`,
 			description
 		}),
+		...(data.summary
+			? [
+					priceHistoryDatasetSchema({
+						name: `${data.name} Hypixel Skyblock Auction Price History`,
+						url: `${site.url}/auctions/${data.slug}`,
+						description,
+						dataUrl: `${site.url}/data/items/${data.slug}.json`,
+						markdownUrl: `${site.url}/auctions/${data.slug}.md`,
+						dateModified: new Date(data.lastUpdated).toISOString(),
+						variables: ['lowest BIN price', 'median BIN price', 'active listings'],
+						temporalCoverage
+					})
+				]
+			: []),
 		breadcrumbSchema([
 			{ name: site.title, url: site.url },
 			{ name: 'Auctions', url: `${site.url}/auctions` },
@@ -54,7 +74,7 @@
 			<span aria-hidden="true"> / </span>
 		</nav>
 		<div class="mt-1 flex flex-wrap items-baseline gap-3">
-			<h1 class="text-2xl font-medium">{data.name}</h1>
+			<h1 class="text-2xl font-medium">{data.name} Auction Price History</h1>
 			<RarityBadge tier={data.tier} />
 			<StarButton kind="auctions" slug={data.slug} name={data.name} />
 		</div>
@@ -69,6 +89,16 @@
 		kind="auctions"
 		primary={{ label: 'Lowest BIN', points: data.history.map((h) => [h.t, h.l]) }}
 		secondary={{ label: 'Median BIN', points: data.history.map((h) => [h.t, h.m]) }}
+	/>
+
+	<HistorySummary
+		itemName={data.name}
+		marketLabel="auction"
+		metricLabel="lowest BIN"
+		secondaryMetricLabel="median BIN"
+		summary={data.summary}
+		dataUrl={`/data/items/${data.slug}.json`}
+		markdownUrl={`/auctions/${data.slug}.md`}
 	/>
 
 	{#if discount >= 0.15}

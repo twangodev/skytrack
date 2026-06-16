@@ -55,3 +55,50 @@ export function itemPageSchema(opts: ItemPageOptions): WithContext<ItemPage> {
 		}
 	};
 }
+
+export interface PriceHistoryDatasetOptions {
+	name: string;
+	url: string;
+	description: string;
+	dataUrl: string;
+	markdownUrl: string;
+	dateModified: string;
+	variables: string[];
+	temporalCoverage?: string;
+}
+
+export function priceHistoryDatasetSchema(opts: PriceHistoryDatasetOptions): object {
+	return {
+		'@context': 'https://schema.org',
+		'@type': 'Dataset',
+		name: opts.name,
+		url: opts.url,
+		description: opts.description,
+		dateModified: opts.dateModified,
+		...(opts.temporalCoverage && { temporalCoverage: opts.temporalCoverage }),
+		isAccessibleForFree: true,
+		creator: {
+			'@type': 'Organization',
+			name: site.title,
+			url: site.url
+		},
+		includedInDataCatalog: {
+			'@type': 'DataCatalog',
+			name: `${site.title} Hypixel Skyblock market history`,
+			url: `${site.url}/docs`
+		},
+		variableMeasured: opts.variables,
+		distribution: [
+			{
+				'@type': 'DataDownload',
+				contentUrl: opts.dataUrl,
+				encodingFormat: 'application/json'
+			},
+			{
+				'@type': 'DataDownload',
+				contentUrl: opts.markdownUrl,
+				encodingFormat: 'text/markdown'
+			}
+		]
+	};
+}

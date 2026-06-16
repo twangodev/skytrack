@@ -1,5 +1,12 @@
 import { error } from '@sveltejs/kit';
-import { loadBazaar, loadItems, bazaarSlugMap, bazaarHistory } from '$lib/server/data';
+import {
+	loadBazaar,
+	loadItems,
+	bazaarSlugMap,
+	bazaarHistory,
+	bazaarSummaryHistory
+} from '$lib/server/data';
+import { summarizeHistory } from '$lib/market/history-summary';
 import { slugFromId } from '$lib/slug';
 import { titleCase } from '$lib/format';
 import type { EntryGenerator, PageServerLoad } from './$types';
@@ -12,13 +19,16 @@ export const load: PageServerLoad = ({ params }) => {
 	if (!id) error(404, 'Unknown product');
 	const { lastUpdated, products } = loadBazaar();
 	const meta = loadItems()[id];
+	const history = bazaarHistory(id);
+	const summaryHistory = bazaarSummaryHistory(id);
 	return {
 		id,
 		slug: params.slug,
 		name: meta?.name ?? titleCase(id),
 		tier: meta?.tier,
 		snapshot: products[id],
-		history: bazaarHistory(id),
+		history,
+		summary: summarizeHistory(summaryHistory.map((point) => ({ t: point.t, value: point.b }))),
 		lastUpdated
 	};
 };

@@ -7,6 +7,12 @@ const config = {
 		adapter: adapter({
 			fallback: '404.html'
 		}),
+		// Root-domain deploy: emit absolute /_app/... asset URLs. Relative paths
+		// (the default) are computed per page depth and race under prerender
+		// concurrency, and would break the SPA 404.html fallback at deep paths.
+		paths: {
+			relative: false
+		},
 		prerender: {
 			concurrency: 8
 		}

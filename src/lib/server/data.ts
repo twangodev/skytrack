@@ -1,7 +1,8 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { decodeStateFile, type BazaarPoint, type AuctionPoint } from '$lib/market/state';
 import type { BazaarProductSnapshot, AuctionItemStats } from '$lib/market/aggregate';
-import { buildSlugMap } from '$lib/slug';
+import { buildSlugMap, slugFromId } from '$lib/slug';
+import { titleCase } from '$lib/format';
 
 export interface ItemMeta {
 	name: string;
@@ -106,4 +107,27 @@ export function auctionSummaryHistory(itemId: string): AuctionHistoryPoint[] {
 	const daily = loadTier<AuctionPoint>('auctions-daily').get(itemId) ?? [];
 	const raw = loadTier<AuctionPoint>('auctions-raw').get(itemId) ?? [];
 	return [...daily, ...raw];
+}
+
+/** A tracked item surfaced as a curated example link. */
+export interface ExampleItem {
+	slug: string;
+	name: string;
+}
+
+/** Most-listed auction items, for data-driven example links (never dangling). */
+export function popularAuctionItems(limit: number): ExampleItem[] {
+	return Object.entries(loadAuctions().items)
+		.sort(([, a], [, b]) => b.count - a.count)
+		.slice(0, limit)
+		.map(([id, stats]) => ({ slug: slugFromId(id), name: stats.name }));
+}
+
+/** Highest-volume bazaar products, for data-driven example links (never dangling). */
+export function popularBazaarItems(limit: number): ExampleItem[] {
+	const items = loadItems();
+	return Object.entries(loadBazaar().products)
+		.sort(([, a], [, b]) => b.qs.bmw + b.qs.smw - (a.qs.bmw + a.qs.smw))
+		.slice(0, limit)
+		.map(([id]) => ({ slug: slugFromId(id), name: items[id]?.name ?? titleCase(id) }));
 }

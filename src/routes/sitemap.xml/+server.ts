@@ -14,6 +14,11 @@ export const GET: RequestHandler = () => {
 		'/movers',
 		'/compare',
 		'/docs',
+		'/skyblock/price-history',
+		'/skyblock/bazaar-price-history',
+		'/skyblock/auction-price-history',
+		'/skyblock/lowest-bin-history',
+		'/skyblock/item-flipping',
 		...[...bazaarSlugMap().keys()].map((slug) => `/bazaar/${slug}`),
 		...[...auctionSlugMap().keys()].map((slug) => `/auctions/${slug}`)
 	];

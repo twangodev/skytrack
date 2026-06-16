@@ -16,6 +16,7 @@
 		>.
 	</p>
 	<div class="flex items-center gap-3">
+		<a href="/skyblock/price-history" class="transition-colors hover:text-text">price history</a>
 		<a
 			href="/docs"
 			title="API documentation"

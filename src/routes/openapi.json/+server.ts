@@ -99,7 +99,12 @@ export const GET: RequestHandler = () => {
 											properties: {
 												slug: { type: 'string' },
 												name: { type: 'string' },
-												kind: { type: 'string', enum: ['bazaar', 'auctions'] }
+												kind: { type: 'string', enum: ['bazaar', 'auctions'] },
+												aliases: {
+													type: 'array',
+													items: { type: 'string' },
+													description: 'Common player shorthand and alternate search terms'
+												}
 											},
 											required: ['slug', 'name', 'kind']
 										}

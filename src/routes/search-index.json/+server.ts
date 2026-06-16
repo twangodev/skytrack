@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { loadBazaar, loadAuctions, loadItems } from '$lib/server/data';
+import { aliasesForItem } from '$lib/aliases';
 import { slugFromId } from '$lib/slug';
 import { titleCase } from '$lib/format';
 import type { RequestHandler } from './$types';
@@ -14,12 +15,14 @@ export const GET: RequestHandler = () => {
 		...Object.keys(loadBazaar().products).map((id) => ({
 			slug: slugFromId(id),
 			name: items[id]?.name ?? titleCase(id),
-			kind: 'bazaar' as const
+			kind: 'bazaar' as const,
+			aliases: aliasesForItem(id)
 		})),
 		...Object.entries(loadAuctions().items).map(([id, stats]) => ({
 			slug: slugFromId(id),
 			name: stats.name,
-			kind: 'auctions' as const
+			kind: 'auctions' as const,
+			aliases: aliasesForItem(id)
 		}))
 	];
 	return json(index, {

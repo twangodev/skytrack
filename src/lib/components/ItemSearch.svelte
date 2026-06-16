@@ -8,6 +8,7 @@
 		slug: string;
 		name: string;
 		kind: 'bazaar' | 'auctions';
+		aliases?: string[];
 		lower: string;
 	}
 
@@ -25,7 +26,10 @@
 		try {
 			const res = await fetch('/search-index.json');
 			const raw = (await res.json()) as Omit<SearchItem, 'lower'>[];
-			items = raw.map((item) => ({ ...item, lower: item.name.toLowerCase() }));
+			items = raw.map((item) => ({
+				...item,
+				lower: [item.name, ...(item.aliases ?? [])].join(' ').toLowerCase()
+			}));
 		} catch {
 			loadStarted = false; // allow a retry on next focus
 		}

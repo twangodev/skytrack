@@ -34,6 +34,7 @@
 		slug: string;
 		name: string;
 		kind: 'bazaar' | 'auctions';
+		aliases?: string[];
 		lower: string;
 	}
 
@@ -60,7 +61,10 @@
 			indexPromise = fetch('/search-index.json')
 				.then((res) => res.json() as Promise<Omit<SearchItem, 'lower'>[]>)
 				.then((raw) => {
-					const mapped = raw.map((item) => ({ ...item, lower: item.name.toLowerCase() }));
+					const mapped = raw.map((item) => ({
+						...item,
+						lower: [item.name, ...(item.aliases ?? [])].join(' ').toLowerCase()
+					}));
 					items = mapped;
 					return mapped;
 				})

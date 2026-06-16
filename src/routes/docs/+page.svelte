@@ -14,7 +14,7 @@
 			method: 'GET',
 			path: '/search-index.json',
 			example: '/search-index.json',
-			text: 'Directory of every tracked item: slug, display name, and kind (bazaar or auctions).'
+			text: 'Directory of every tracked item: slug, display name, kind (bazaar or auctions), and common aliases for search.'
 		},
 		{
 			method: 'GET',

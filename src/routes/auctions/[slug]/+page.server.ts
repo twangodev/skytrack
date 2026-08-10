@@ -1,25 +1,24 @@
 import { error } from '@sveltejs/kit';
 import {
-	loadAuctions,
-	loadItems,
-	auctionSlugMap,
+	requireDb,
+	getAuctionSnapshot,
+	resolveAuctionId,
 	auctionHistory,
 	auctionSummaryHistory
-} from '$lib/server/data';
+} from '$lib/server/db';
 import { summarizeHistory } from '$lib/market/history-summary';
-import { slugFromId } from '$lib/slug';
-import type { EntryGenerator, PageServerLoad } from './$types';
+import type { PageServerLoad } from './$types';
 
-export const entries: EntryGenerator = () =>
-	Object.keys(loadAuctions().items).map((id) => ({ slug: slugFromId(id) }));
-
-export const load: PageServerLoad = ({ params }) => {
-	const id = auctionSlugMap().get(params.slug);
+export const load: PageServerLoad = async ({ params, platform }) => {
+	const db = requireDb(platform);
+	const id = await resolveAuctionId(db, params.slug);
 	if (!id) error(404, 'Unknown item');
-	const { lastUpdated, items } = loadAuctions();
+	const [{ lastUpdated, items }, history, summaryHistory] = await Promise.all([
+		getAuctionSnapshot(db),
+		auctionHistory(db, id),
+		auctionSummaryHistory(db, id)
+	]);
 	const stats = items[id];
-	const history = auctionHistory(id);
-	const summaryHistory = auctionSummaryHistory(id);
 	return {
 		slug: params.slug,
 		name: stats.name,

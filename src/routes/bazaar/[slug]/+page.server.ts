@@ -1,26 +1,27 @@
 import { error } from '@sveltejs/kit';
 import {
-	loadBazaar,
-	loadItems,
-	bazaarSlugMap,
+	requireDb,
+	getBazaarSnapshot,
+	getItems,
+	resolveBazaarId,
 	bazaarHistory,
 	bazaarSummaryHistory
-} from '$lib/server/data';
+} from '$lib/server/db';
 import { summarizeHistory } from '$lib/market/history-summary';
-import { slugFromId } from '$lib/slug';
 import { titleCase } from '$lib/format';
-import type { EntryGenerator, PageServerLoad } from './$types';
+import type { PageServerLoad } from './$types';
 
-export const entries: EntryGenerator = () =>
-	Object.keys(loadBazaar().products).map((id) => ({ slug: slugFromId(id) }));
-
-export const load: PageServerLoad = ({ params }) => {
-	const id = bazaarSlugMap().get(params.slug);
+export const load: PageServerLoad = async ({ params, platform }) => {
+	const db = requireDb(platform);
+	const id = await resolveBazaarId(db, params.slug);
 	if (!id) error(404, 'Unknown product');
-	const { lastUpdated, products } = loadBazaar();
-	const meta = loadItems()[id];
-	const history = bazaarHistory(id);
-	const summaryHistory = bazaarSummaryHistory(id);
+	const [{ lastUpdated, products }, items, history, summaryHistory] = await Promise.all([
+		getBazaarSnapshot(db),
+		getItems(db),
+		bazaarHistory(db, id),
+		bazaarSummaryHistory(db, id)
+	]);
+	const meta = items[id];
 	return {
 		id,
 		slug: params.slug,

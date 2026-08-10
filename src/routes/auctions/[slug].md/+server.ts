@@ -1,23 +1,20 @@
 import { error } from '@sveltejs/kit';
-import { loadAuctions, auctionSlugMap, auctionHistory } from '$lib/server/data';
-import { slugFromId } from '$lib/slug';
+import { requireDb, getAuctionSnapshot, resolveAuctionId, auctionHistory } from '$lib/server/db';
 import { formatPrice } from '$lib/format';
 import { site } from '$lib/config';
-import type { EntryGenerator, RequestHandler } from './$types';
-
-export const prerender = true;
-
-export const entries: EntryGenerator = () =>
-	Object.keys(loadAuctions().items).map((id) => ({ slug: slugFromId(id) }));
+import type { RequestHandler } from './$types';
 
 const iso = (t: number) => new Date(t * 1000).toISOString().slice(0, 16) + 'Z';
 
-export const GET: RequestHandler = ({ params }) => {
-	const id = auctionSlugMap().get(params.slug);
+export const GET: RequestHandler = async ({ params, platform }) => {
+	const db = requireDb(platform);
+	const id = await resolveAuctionId(db, params.slug);
 	if (!id) error(404, 'Unknown item');
-	const { lastUpdated, items } = loadAuctions();
+	const [{ lastUpdated, items }, history] = await Promise.all([
+		getAuctionSnapshot(db),
+		auctionHistory(db, id)
+	]);
 	const stats = items[id];
-	const history = auctionHistory(id);
 
 	const body = `# ${stats.name}
 

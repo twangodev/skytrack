@@ -1,0 +1,258 @@
+// D1-backed data layer - replaces the file-reading src/lib/server/data.ts.
+// Per-isolate TTL cache: snapshots/items are shared across every request an
+// isolate serves; 60s staleness is invisible next to the 5-min data cadence.
+import { error } from '@sveltejs/kit';
+import type { D1Database } from '@cloudflare/workers-types';
+// Relative imports, not the $lib alias: workers/pipeline/test/site-db.test.ts
+// imports this module directly and runs under a plain vitest/config +
+// @cloudflare/vitest-pool-workers setup with no SvelteKit vite plugin, so
+// $lib isn't resolvable there (same reason workers/pipeline/src/db.ts uses
+// relative imports). Relative paths resolve identically in both contexts.
+import type { BazaarProductSnapshot, AuctionItemStats } from '../market/aggregate';
+import { RAW_SLICE, type ItemSeriesJson, type BazaarTuple, type AuctionTuple } from '../market/series';
+import { titleCase } from '../format';
+
+export interface ItemMeta {
+	name: string;
+	tier?: string;
+	category?: string;
+	npc?: number;
+}
+
+export interface BazaarFile {
+	lastUpdated: number;
+	products: Record<string, BazaarProductSnapshot>;
+}
+
+export interface AuctionsFile {
+	lastUpdated: number;
+	items: Record<string, AuctionItemStats>;
+}
+
+export type BazaarHistoryPoint = { t: number; b: number; s: number };
+export type AuctionHistoryPoint = { t: number; l: number; m: number; c: number };
+
+export interface ExampleItem {
+	slug: string;
+	name: string;
+}
+
+const DAY = 86_400;
+const TTL_MS = 60_000;
+
+export function requireDb(platform: App.Platform | undefined): D1Database {
+	if (!platform?.env.DB) error(500, 'database unavailable');
+	return platform.env.DB;
+}
+
+const cache = new Map<string, { at: number; value: unknown }>();
+
+async function cached<T>(key: string, compute: () => Promise<T>): Promise<T> {
+	const hit = cache.get(key);
+	if (hit && Date.now() - hit.at < TTL_MS) return hit.value as T;
+	const value = await compute();
+	cache.set(key, { at: Date.now(), value });
+	return value;
+}
+
+interface ItemsIndex {
+	byId: Record<string, ItemMeta>;
+	slugToId: Map<string, string>;
+	idToSlug: Map<string, string>;
+}
+
+async function itemsIndex(db: D1Database): Promise<ItemsIndex> {
+	return cached('items', async () => {
+		const { results } = await db
+			.prepare('SELECT id, slug, name, tier, category, npc FROM items')
+			.all<{ id: string; slug: string; name: string; tier: string | null; category: string | null; npc: number | null }>();
+		const byId: Record<string, ItemMeta> = {};
+		const slugToId = new Map<string, string>();
+		const idToSlug = new Map<string, string>();
+		for (const r of results) {
+			byId[r.id] = {
+				name: r.name,
+				...(r.tier != null && { tier: r.tier }),
+				...(r.category != null && { category: r.category }),
+				...(r.npc != null && { npc: r.npc })
+			};
+			slugToId.set(r.slug, r.id);
+			idToSlug.set(r.id, r.slug);
+		}
+		return { byId, slugToId, idToSlug };
+	});
+}
+
+export const getItems = async (db: D1Database): Promise<Record<string, ItemMeta>> => (await itemsIndex(db)).byId;
+
+export const getItemIdBySlug = async (db: D1Database, slug: string): Promise<string | undefined> =>
+	(await itemsIndex(db)).slugToId.get(slug);
+
+async function metaMs(db: D1Database, key: string): Promise<number> {
+	const row = await db.prepare('SELECT value FROM meta WHERE key = ?').bind(key).first<{ value: string }>();
+	return row ? Number(row.value) : 0;
+}
+
+export async function getBazaarSnapshot(db: D1Database): Promise<BazaarFile> {
+	return cached('bazaar', async () => {
+		const [{ results }, lastUpdated] = await Promise.all([
+			db.prepare('SELECT item, body FROM bazaar_snapshot').all<{ item: string; body: string }>(),
+			metaMs(db, 'bazaar_updated')
+		]);
+		const products: Record<string, BazaarProductSnapshot> = {};
+		for (const r of results) products[r.item] = JSON.parse(r.body);
+		return { lastUpdated, products };
+	});
+}
+
+export async function getAuctionSnapshot(db: D1Database): Promise<AuctionsFile> {
+	return cached('auctions', async () => {
+		const [{ results }, lastUpdated] = await Promise.all([
+			db.prepare('SELECT item, body FROM auction_snapshot').all<{ item: string; body: string }>(),
+			metaMs(db, 'auctions_updated')
+		]);
+		const items: Record<string, AuctionItemStats> = {};
+		for (const r of results) items[r.item] = JSON.parse(r.body);
+		return { lastUpdated, items };
+	});
+}
+
+// Kind-scoped resolution: today's slug maps were built from the current
+// snapshot's keys, so a slug only resolves on /bazaar/* while the product is
+// actually listed (and likewise for auctions). Preserve that.
+export async function resolveBazaarId(db: D1Database, slug: string): Promise<string | undefined> {
+	const id = await getItemIdBySlug(db, slug);
+	if (!id) return undefined;
+	return (await getBazaarSnapshot(db)).products[id] ? id : undefined;
+}
+
+export async function resolveAuctionId(db: D1Database, slug: string): Promise<string | undefined> {
+	const id = await getItemIdBySlug(db, slug);
+	if (!id) return undefined;
+	return (await getAuctionSnapshot(db)).items[id] ? id : undefined;
+}
+
+export async function bazaarHistory(db: D1Database, id: string): Promise<BazaarHistoryPoint[]> {
+	const now = Math.floor(Date.now() / 1000);
+	const { results } = await db
+		.prepare(
+			`SELECT t, buy AS b, sell AS s FROM bazaar_points
+			 WHERE item = ?1 AND (tier = 2 OR (tier = 1 AND t >= ?2) OR (tier = 0 AND t >= ?3))
+			 ORDER BY t`
+		)
+		.bind(id, now - 7 * DAY, now - DAY)
+		.all<BazaarHistoryPoint>();
+	return results;
+}
+
+export async function bazaarSummaryHistory(db: D1Database, id: string): Promise<BazaarHistoryPoint[]> {
+	const { results } = await db
+		.prepare('SELECT t, buy AS b, sell AS s FROM bazaar_points WHERE item = ?')
+		.bind(id)
+		.all<BazaarHistoryPoint>();
+	return results;
+}
+
+export async function auctionHistory(db: D1Database, id: string): Promise<AuctionHistoryPoint[]> {
+	const now = Math.floor(Date.now() / 1000);
+	const { results } = await db
+		.prepare(
+			`SELECT t, lowest AS l, median AS m, count AS c FROM auction_points
+			 WHERE item = ?1 AND (tier = 2 OR (tier = 0 AND t >= ?2))
+			 ORDER BY t`
+		)
+		.bind(id, now - 7 * DAY)
+		.all<AuctionHistoryPoint>();
+	return results;
+}
+
+export async function auctionSummaryHistory(db: D1Database, id: string): Promise<AuctionHistoryPoint[]> {
+	const { results } = await db
+		.prepare('SELECT t, lowest AS l, median AS m, count AS c FROM auction_points WHERE item = ?')
+		.bind(id)
+		.all<AuctionHistoryPoint>();
+	return results;
+}
+
+// First and latest raw price per currently-listed product; both subqueries
+// seek on the (item, tier, t) PK, so this reads ~2 index rows per product
+// instead of the whole window.
+export async function bazaarWindowChanges(
+	db: D1Database,
+	since: number
+): Promise<{ id: string; first: number; last: number }[]> {
+	const { results } = await db
+		.prepare(
+			`SELECT s.item AS id,
+				(SELECT buy FROM bazaar_points p WHERE p.item = s.item AND p.tier = 0 AND p.t >= ?1 ORDER BY p.t LIMIT 1) AS first,
+				(SELECT buy FROM bazaar_points p WHERE p.item = s.item AND p.tier = 0 ORDER BY p.t DESC LIMIT 1) AS last
+			 FROM bazaar_snapshot s`
+		)
+		.bind(since)
+		.all<{ id: string; first: number | null; last: number | null }>();
+	return results.filter((r): r is { id: string; first: number; last: number } => r.first != null && r.last != null);
+}
+
+export async function bazaarSeriesSince(
+	db: D1Database,
+	ids: string[],
+	since: number
+): Promise<Map<string, BazaarHistoryPoint[]>> {
+	const out = new Map<string, BazaarHistoryPoint[]>();
+	for (let i = 0; i < ids.length; i += 90) {
+		const chunk = ids.slice(i, i + 90); // 90 + 1 binds, under D1's 100-param cap
+		const placeholders = chunk.map(() => '?').join(',');
+		const { results } = await db
+			.prepare(
+				`SELECT item, t, buy AS b, sell AS s FROM bazaar_points
+				 WHERE tier = 0 AND t >= ? AND item IN (${placeholders}) ORDER BY t`
+			)
+			.bind(since, ...chunk)
+			.all<BazaarHistoryPoint & { item: string }>();
+		for (const { item, ...point } of results) {
+			const list = out.get(item) ?? [];
+			list.push(point);
+			out.set(item, list);
+		}
+	}
+	return out;
+}
+
+export async function itemSeriesJson(db: D1Database, id: string): Promise<ItemSeriesJson> {
+	const now = Math.floor(Date.now() / 1000);
+	const [bRaw, bHourly, bDaily, aRaw, aDaily] = await db.batch([
+		db.prepare('SELECT t, buy, sell FROM bazaar_points WHERE item = ?1 AND tier = 0 AND t >= ?2 ORDER BY t').bind(id, now - RAW_SLICE),
+		// thinHourly keeps points where (t/3600) % 4 === 0, i.e. t % 14400 === 0
+		db.prepare('SELECT t, buy, sell FROM bazaar_points WHERE item = ?1 AND tier = 1 AND t % 14400 = 0 ORDER BY t').bind(id),
+		db.prepare('SELECT t, buy, sell FROM bazaar_points WHERE item = ?1 AND tier = 2 ORDER BY t').bind(id),
+		db.prepare('SELECT t, lowest, median, count FROM auction_points WHERE item = ?1 AND tier = 0 AND t >= ?2 ORDER BY t').bind(id, now - RAW_SLICE),
+		db.prepare('SELECT t, lowest, median, count FROM auction_points WHERE item = ?1 AND tier = 2 ORDER BY t').bind(id)
+	]);
+	const b = (rows: unknown): BazaarTuple[] =>
+		(rows as { t: number; buy: number; sell: number }[]).map((r) => [r.t, r.buy, r.sell]);
+	const a = (rows: unknown): AuctionTuple[] =>
+		(rows as { t: number; lowest: number; median: number; count: number }[]).map((r) => [r.t, r.lowest, r.median, r.count]);
+
+	const out: ItemSeriesJson = {};
+	const bazaar = { raw: b(bRaw.results), hourly: b(bHourly.results), daily: b(bDaily.results) };
+	if (bazaar.raw.length || bazaar.hourly.length || bazaar.daily.length) out.bazaar = bazaar;
+	const auctions = { raw: a(aRaw.results), daily: a(aDaily.results) };
+	if (auctions.raw.length || auctions.daily.length) out.auctions = auctions;
+	return out;
+}
+
+export async function popularAuctionItems(db: D1Database, limit: number): Promise<ExampleItem[]> {
+	const [{ items }, index] = await Promise.all([getAuctionSnapshot(db), itemsIndex(db)]);
+	return Object.entries(items)
+		.sort(([, a], [, b]) => b.count - a.count)
+		.slice(0, limit)
+		.map(([id, stats]) => ({ slug: index.idToSlug.get(id) ?? id.toLowerCase(), name: stats.name }));
+}
+
+export async function popularBazaarItems(db: D1Database, limit: number): Promise<ExampleItem[]> {
+	const [{ products }, index] = await Promise.all([getBazaarSnapshot(db), itemsIndex(db)]);
+	return Object.entries(products)
+		.sort(([, a], [, b]) => b.qs.bmw + b.qs.smw - (a.qs.bmw + a.qs.smw))
+		.slice(0, limit)
+		.map(([id]) => ({ slug: index.idToSlug.get(id) ?? id.toLowerCase(), name: index.byId[id]?.name ?? titleCase(id) }));
+}

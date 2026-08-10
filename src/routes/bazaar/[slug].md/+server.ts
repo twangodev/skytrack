@@ -1,35 +1,45 @@
 import { error } from '@sveltejs/kit';
-import { loadBazaar, loadItems, bazaarSlugMap, bazaarRaw, bazaarHistory } from '$lib/server/data';
-import { slugFromId } from '$lib/slug';
+import {
+	requireDb,
+	getBazaarSnapshot,
+	getItems,
+	resolveBazaarId,
+	bazaarHistory,
+	bazaarSeriesSince
+} from '$lib/server/db';
 import { titleCase, formatPrice, formatCompact } from '$lib/format';
 import { site } from '$lib/config';
-import type { EntryGenerator, RequestHandler } from './$types';
+import type { RequestHandler } from './$types';
 
-export const prerender = true;
-
-export const entries: EntryGenerator = () =>
-	Object.keys(loadBazaar().products).map((id) => ({ slug: slugFromId(id) }));
+const DAY = 86_400;
 
 const iso = (t: number) => new Date(t * 1000).toISOString().slice(0, 16) + 'Z';
 
-export const GET: RequestHandler = ({ params }) => {
-	const id = bazaarSlugMap().get(params.slug);
+export const GET: RequestHandler = async ({ params, platform }) => {
+	const db = requireDb(platform);
+	const id = await resolveBazaarId(db, params.slug);
 	if (!id) error(404, 'Unknown product');
-	const { lastUpdated, products } = loadBazaar();
+	const now = Math.floor(Date.now() / 1000);
+	const [{ lastUpdated, products }, items, rawSeries, history] = await Promise.all([
+		getBazaarSnapshot(db),
+		getItems(db),
+		bazaarSeriesSince(db, [id], now - 2 * DAY),
+		bazaarHistory(db, id)
+	]);
 	const snap = products[id];
-	const meta = loadItems()[id];
+	const meta = items[id];
 	const name = meta?.name ?? titleCase(id);
 
 	// last 24h at hourly sampling keeps the table readable
-	const raw = bazaarRaw(id);
+	const raw = rawSeries.get(id) ?? [];
 	const newest = raw[raw.length - 1]?.t ?? 0;
 	const recent = raw
-		.filter((p) => p.t >= newest - 86_400)
+		.filter((p) => p.t >= newest - DAY)
 		.filter(
 			(p, i, list) =>
 				i === list.length - 1 || Math.floor(p.t / 3600) !== Math.floor((list[i + 1]?.t ?? 0) / 3600)
 		);
-	const daily = bazaarHistory(id).filter((p) => p.t < newest - 86_400);
+	const daily = history.filter((p) => p.t < newest - DAY);
 
 	const body = `# ${name}
 

@@ -13,6 +13,7 @@
 		"format": "prettier --write .",
 		"lint": "prettier --check .",
 		"test": "vitest run",
+		"test:workers": "cd workers/pipeline && bunx vitest run",
 		"fetch": "bun scripts/fetch-data.ts",
 		"icons": "bun scripts/generate-icons.ts",
 		"proto": "buf generate"

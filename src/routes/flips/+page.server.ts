@@ -1,11 +1,12 @@
-import { loadBazaar, loadItems } from '$lib/server/data';
+import { requireDb, getBazaarSnapshot, getItems } from '$lib/server/db';
 import { slugFromId } from '$lib/slug';
 import { titleCase } from '$lib/format';
 import { flipQuote } from '$lib/market/flips';
+import type { PageServerLoad } from './$types';
 
-export function load() {
-	const { lastUpdated, products } = loadBazaar();
-	const items = loadItems();
+export const load: PageServerLoad = async ({ platform }) => {
+	const db = requireDb(platform);
+	const [{ lastUpdated, products }, items] = await Promise.all([getBazaarSnapshot(db), getItems(db)]);
 	const rows = Object.entries(products)
 		.filter(([, snap]) => snap.qs.bp > 0 && snap.qs.sp > 0)
 		.map(([id, snap]) => {
@@ -27,4 +28,4 @@ export function load() {
 		.filter((row) => row.profit > 0)
 		.sort((a, b) => b.weeklyPotential - a.weeklyPotential);
 	return { lastUpdated, rows };
-}
+};

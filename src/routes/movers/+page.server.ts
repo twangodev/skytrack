@@ -1,7 +1,8 @@
-import { loadBazaar, loadItems, bazaarRaw } from '$lib/server/data';
+import { requireDb, getBazaarSnapshot, getItems, bazaarWindowChanges, bazaarSeriesSince } from '$lib/server/db';
 import { downsample } from '$lib/server/spark';
 import { slugFromId } from '$lib/slug';
 import { titleCase } from '$lib/format';
+import type { PageServerLoad } from './$types';
 
 interface Row {
 	id: string;
@@ -17,52 +18,50 @@ const WINDOWS = [
 	['w1', 604_800]
 ] as const;
 
-export function load() {
-	const { lastUpdated, products } = loadBazaar();
-	const items = loadItems();
+export const load: PageServerLoad = async ({ platform }) => {
+	const db = requireDb(platform);
+	const [{ lastUpdated, products }, items] = await Promise.all([getBazaarSnapshot(db), getItems(db)]);
 	const now = Math.floor(Date.now() / 1000);
 
-	// Liquid products only; the raw tier (15-min points, ~30d) covers both
-	// windows - the SSR-capped bazaarHistory would truncate 1W to 24h.
-	const candidates = Object.entries(products)
-		.filter(([, snap]) => snap.qs.bmw >= 100_000)
-		.map(([id, snap]) => ({
-			id,
-			slug: slugFromId(id),
-			name: items[id]?.name ?? titleCase(id),
-			price: snap.qs.bp,
-			history: bazaarRaw(id)
-		}));
-
 	const windows = Object.fromEntries(
-		WINDOWS.map(([key, seconds]) => {
-			const ranked: Row[] = candidates
-				.map(({ history, ...row }) => {
-					const points = history.filter((h) => h.t >= now - seconds);
-					if (points.length < 2) return null;
-					const first = points[0].b;
-					const last = points[points.length - 1].b;
-					if (first <= 0) return null;
-					return {
-						...row,
-						change: (last - first) / first,
-						spark: downsample(points.map((h) => [h.t, h.b] as [number, number]))
-					};
-				})
-				.filter((r) => r !== null)
-				.sort((a, b) => b.change - a.change);
-			return [
-				key,
-				{
-					gainers: ranked.filter((r) => r.change > 0).slice(0, 20),
-					losers: ranked
-						.filter((r) => r.change < 0)
-						.sort((a, b) => a.change - b.change)
-						.slice(0, 20)
-				}
-			];
-		})
+		await Promise.all(
+			WINDOWS.map(async ([key, seconds]) => {
+				const changes = await bazaarWindowChanges(db, now - seconds);
+				const ranked = changes
+					.map(({ id, first, last }) => {
+						const snap = products[id];
+						if (!snap) return null;
+						if (snap.qs.bmw < 100_000) return null;
+						if (first <= 0) return null;
+						return {
+							id,
+							slug: slugFromId(id),
+							name: items[id]?.name ?? titleCase(id),
+							price: snap.qs.bp,
+							change: (last - first) / first
+						};
+					})
+					.filter((r) => r !== null)
+					.sort((a, b) => b.change - a.change);
+
+				const gainers = ranked.filter((r) => r.change > 0).slice(0, 20);
+				const losers = ranked
+					.filter((r) => r.change < 0)
+					.sort((a, b) => a.change - b.change)
+					.slice(0, 20);
+
+				// Sparks only for the rows the page actually displays.
+				const displayedIds = [...gainers, ...losers].map((r) => r.id);
+				const sparks = await bazaarSeriesSince(db, displayedIds, now - seconds);
+				const withSpark = (row: (typeof ranked)[number]): Row => ({
+					...row,
+					spark: downsample((sparks.get(row.id) ?? []).map((h) => [h.t, h.b] as [number, number]))
+				});
+
+				return [key, { gainers: gainers.map(withSpark), losers: losers.map(withSpark) }] as const;
+			})
+		)
 	) as Record<'d1' | 'w1', { gainers: Row[]; losers: Row[] }>;
 
 	return { lastUpdated, windows };
-}
+};

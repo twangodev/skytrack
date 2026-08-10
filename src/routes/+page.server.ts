@@ -1,69 +1,89 @@
 import {
-	loadBazaar,
-	loadAuctions,
-	loadItems,
-	bazaarHistory,
-	type BazaarHistoryPoint
-} from '$lib/server/data';
+	requireDb,
+	getBazaarSnapshot,
+	getAuctionSnapshot,
+	getItems,
+	bazaarWindowChanges,
+	bazaarSeriesSince
+} from '$lib/server/db';
 import { slugFromId } from '$lib/slug';
 import { titleCase } from '$lib/format';
 import { flipQuote, isFlipOpportunity } from '$lib/market/flips';
+import type { PageServerLoad } from './$types';
 
-export function load() {
-	const bazaar = loadBazaar();
-	const auctions = loadAuctions();
-	const items = loadItems();
+export const load: PageServerLoad = async ({ platform }) => {
+	const db = requireDb(platform);
+	const [bazaar, auctions, items] = await Promise.all([
+		getBazaarSnapshot(db),
+		getAuctionSnapshot(db),
+		getItems(db)
+	]);
 
 	// Top movers: biggest |%Δ| in instabuy over a rolling 24h, liquid items only.
 	// Rolling rather than calendar-day: a UTC-midnight anchor leaves the whole
 	// dashboard empty for builds in the first minutes of each day.
 	const windowStart = Math.floor(Date.now() / 1000) - 86_400;
-	const movers = Object.entries(bazaar.products)
-		.map(([id, snap]) => {
+	const changes = await bazaarWindowChanges(db, windowStart);
+
+	// Movers + breadth share the same ranked rows, computed once from the
+	// window-change query (cheap PK seeks) instead of per-product history.
+	let up = 0;
+	let down = 0;
+	const ranked = changes
+		.map(({ id, first, last }) => {
+			const snap = bazaar.products[id];
+			if (!snap) return null;
 			if (snap.qs.bmw < 100_000) return null;
-			// history is chronological; recent points are a suffix
-			const history = bazaarHistory(id).filter((h) => h.t >= windowStart);
-			if (history.length < 2) return null;
-			const first = history[0].b;
-			const last = history[history.length - 1].b;
 			if (first <= 0) return null;
+			const change = (last - first) / first;
 			return {
 				id,
 				slug: slugFromId(id),
 				name: items[id]?.name ?? titleCase(id),
 				price: snap.qs.bp,
-				change: (last - first) / first,
-				spark: history.map((h) => [h.t, h.b] as [number, number])
+				change
 			};
 		})
-		.filter((m) => m !== null)
-		.sort((a, b) => Math.abs(b.change) - Math.abs(a.change))
-		.slice(0, 6);
+		.filter((m) => m !== null);
 
-	// Market dashboard stats: total weekly volume, 24h breadth, equal-weight index.
+	for (const { change } of ranked) {
+		if (change > 0.001) up++;
+		else if (change < -0.001) down++;
+	}
+
+	const top6 = ranked.sort((a, b) => Math.abs(b.change) - Math.abs(a.change)).slice(0, 6);
+	const sparks = await bazaarSeriesSince(
+		db,
+		top6.map((m) => m.id),
+		windowStart
+	);
+	const movers = top6.map((m) => ({
+		...m,
+		spark: (sparks.get(m.id) ?? []).map((h) => [h.t, h.b] as [number, number])
+	}));
+
+	// Market dashboard stats: total weekly volume, equal-weight index.
 	let totalWeeklyVolume = 0;
-	let up = 0;
-	let down = 0;
-	const liquid: { bmw: number; history: BazaarHistoryPoint[] }[] = [];
-
+	const liquid: { id: string; bmw: number }[] = [];
 	for (const [id, snap] of Object.entries(bazaar.products)) {
 		totalWeeklyVolume += snap.qs.bmw + snap.qs.smw;
 		if (snap.qs.bmw < 100_000) continue;
-		const history = bazaarHistory(id).filter((h) => h.t >= windowStart);
-		if (history.length < 2) continue;
-		const first = history[0].b;
-		if (first <= 0) continue;
-		const change = (history[history.length - 1].b - first) / first;
-		if (change > 0.001) up++;
-		else if (change < -0.001) down++;
-		liquid.push({ bmw: snap.qs.bmw, history });
+		liquid.push({ id, bmw: snap.qs.bmw });
 	}
 
 	// Equal-weight index: the window's points of the 50 most liquid products, each
 	// normalized to its first point, averaged per timestamp bucket.
+	const indexIds = liquid
+		.sort((a, b) => b.bmw - a.bmw)
+		.slice(0, 50)
+		.map((l) => l.id);
+	const indexSeries = await bazaarSeriesSince(db, indexIds, windowStart);
 	const buckets = new Map<number, number[]>();
-	for (const { history } of liquid.sort((a, b) => b.bmw - a.bmw).slice(0, 50)) {
+	for (const id of indexIds) {
+		const history = indexSeries.get(id) ?? [];
+		if (history.length === 0) continue;
 		const base = history[0].b;
+		if (base <= 0) continue;
 		for (const point of history) {
 			let values = buckets.get(point.t);
 			if (!values) buckets.set(point.t, (values = []));
@@ -111,4 +131,4 @@ export function load() {
 		auctionCount: Object.keys(auctions.items).length,
 		lastUpdated: bazaar.lastUpdated
 	};
-}
+};

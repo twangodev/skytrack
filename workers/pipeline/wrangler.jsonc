@@ -4,5 +4,13 @@
 	"main": "src/index.ts",
 	"compatibility_date": "2026-08-01",
 	"compatibility_flags": ["nodejs_compat"],
-	"observability": { "enabled": true }
+	"observability": { "enabled": true },
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "skytrack",
+			"database_id": "7188bd2c-07c4-419b-9c37-ae7e186452f9",
+			"migrations_dir": "migrations"
+		}
+	]
 }

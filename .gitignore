@@ -9,3 +9,4 @@ src/lib/data/*.json
 vite.config.ts.timestamp-*
 static/data/
 .wrangler/
+import-sql/

@@ -1,4 +1,4 @@
-import type { BazaarProduct } from '$lib/hypixel/types';
+import type { BazaarProduct } from '../hypixel/types';
 
 export function median(values: number[]): number {
 	if (values.length === 0) return NaN;

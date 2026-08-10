@@ -5,8 +5,18 @@ import {
 	Kind,
 	Tier,
 	type ItemSeries
-} from '$lib/proto/history_pb';
-import { median } from './aggregate';
+} from '../proto/history_pb';
+import {
+	bucketMedian,
+	bazaarMedian,
+	auctionMedian,
+	RAW_WINDOW,
+	HOURLY_WINDOW,
+	DAY,
+	HOUR
+} from './bucket';
+
+export { RAW_WINDOW, HOURLY_WINDOW };
 
 export type BazaarPoint = { t: number; b: number; s: number };
 export type AuctionPoint = { t: number; l: number; m: number; c: number };
@@ -22,14 +32,6 @@ export interface MarketState {
 		daily: Map<string, AuctionPoint[]>;
 	};
 }
-
-const DAY = 86_400;
-const HOUR = 3_600;
-
-/** raw points kept this long, then rolled to the next tier */
-export const RAW_WINDOW = 90 * DAY;
-/** hourly points kept this long, then rolled to daily */
-export const HOURLY_WINDOW = 730 * DAY;
 
 export const STATE_FILES = [
 	{ name: 'bazaar-raw', kind: 'bazaar', tier: 'raw' },
@@ -171,38 +173,6 @@ export function appendSnapshot(
 		(target as Map<string, AnyPoint[]>).set(id, list);
 	}
 }
-
-function bucketMedian<P extends AnyPoint>(
-	points: P[],
-	bucketSeconds: number,
-	reduce: (bucket: P[], bucketStart: number) => P
-): P[] {
-	const buckets = new Map<number, P[]>();
-	for (const point of points) {
-		const start = Math.floor(point.t / bucketSeconds) * bucketSeconds;
-		const list = buckets.get(start) ?? [];
-		list.push(point);
-		buckets.set(start, list);
-	}
-	return [...buckets.entries()]
-		.sort(([x], [y]) => x - y)
-		.map(([start, list]) => reduce(list, start));
-}
-
-const round1 = (n: number) => Math.round(n * 10) / 10;
-
-const bazaarMedian = (bucket: BazaarPoint[], t: number): BazaarPoint => ({
-	t,
-	b: round1(median(bucket.map((p) => p.b))),
-	s: round1(median(bucket.map((p) => p.s)))
-});
-
-const auctionMedian = (bucket: AuctionPoint[], t: number): AuctionPoint => ({
-	t,
-	l: Math.round(median(bucket.map((p) => p.l))),
-	m: Math.round(median(bucket.map((p) => p.m))),
-	c: Math.max(...bucket.map((p) => p.c))
-});
 
 function spill<P extends AnyPoint>(
 	from: Map<string, P[]>,

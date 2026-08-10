@@ -30,7 +30,8 @@ export const GET: RequestHandler = () => {
 
 	const body = `# ${site.title} full item directory
 
-${site.description}
+> ${site.description}
+
 Data from the official Hypixel API, last refreshed ${updated}. Prices in Skyblock coins.
 
 ## Bazaar (${bazaarLines.length} products)

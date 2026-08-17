@@ -1,15 +1,6 @@
-name: Build and Deploy
+name: CI & Deploy
 
-on:
-  push:
-  # data refreshes are dispatched every 5m by the skytrack cloudflare worker
-  # (workers/deploy-cron); github's own cron scheduler proved too unreliable
-  workflow_dispatch:
-    inputs:
-      data_only:
-        description: Data-only refresh (skip tests and checks)
-        type: boolean
-        default: false
+on: push
 
 permissions:
   contents: read
@@ -18,7 +9,7 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
 
 jobs:
-  build:
+  ci:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -27,37 +18,21 @@ jobs:
         uses: oven-sh/setup-bun@v2
       - name: Install Dependencies
         run: bun install --frozen-lockfile
-      - name: Fetch Market Data
-        run: bun run fetch --force
-        env:
-          # first deploys are auto-detected; BOOTSTRAP is a manual override for recovery
-          BOOTSTRAP: ${{ vars.BOOTSTRAP || '0' }}
-          GH_TOKEN: ${{ github.token }}
-      # data-only cron runs reuse the code already validated on push
       - name: Test
-        if: ${{ !inputs.data_only }}
         run: bun run test
+      - name: Worker Tests
+        run: bun run test:workers
       - name: Check
-        if: ${{ !inputs.data_only }}
         run: bun run check
       - name: Build
         run: bun run build
-      - name: Upload Pages Artifact
-        uses: actions/upload-pages-artifact@v5
-        with:
-          path: build
-
-  deploy:
-    needs: build
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v5
+      - name: Deploy Site
+        if: github.ref == 'refs/heads/main'
+        run: bunx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      - name: Deploy Pipeline
+        if: github.ref == 'refs/heads/main'
+        run: bunx wrangler deploy -c workers/pipeline/wrangler.jsonc
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

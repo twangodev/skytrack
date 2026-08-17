@@ -14,6 +14,8 @@
 		"lint": "prettier --check .",
 		"test": "vitest run",
 		"test:workers": "cd workers/pipeline && bunx vitest run",
+		"db:migrate:local": "cd workers/pipeline && bunx wrangler d1 migrations apply skytrack --local --persist-to ../../.wrangler/state",
+		"db:seed:local": "cd workers/pipeline && bunx wrangler dev --test-scheduled --var BOOTSTRAP:1 --persist-to ../../.wrangler/state",
 		"fetch": "bun scripts/fetch-data.ts",
 		"icons": "bun scripts/generate-icons.ts",
 		"proto": "buf generate"

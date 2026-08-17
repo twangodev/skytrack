@@ -1,9 +1,14 @@
-import { auctionHistory, loadAuctions } from '$lib/server/data';
-import { spark7d } from '$lib/server/spark';
+import { requireDb, getAuctionSnapshot, auctionSparks } from '$lib/server/db';
 import { slugFromId } from '$lib/slug';
+import type { PageServerLoad } from './$types';
 
-export function load() {
-	const { lastUpdated, items } = loadAuctions();
+export const load: PageServerLoad = async ({ platform }) => {
+	const db = requireDb(platform);
+	const now = Math.floor(Date.now() / 1000);
+	const [{ lastUpdated, items }, sparks] = await Promise.all([
+		getAuctionSnapshot(db),
+		auctionSparks(db, now)
+	]);
 	const rows = Object.entries(items)
 		.map(([id, stats]) => ({
 			id,
@@ -14,8 +19,8 @@ export function load() {
 			medianBin: stats.medianBin,
 			count: stats.count,
 			discount: stats.medianBin > 0 ? (stats.medianBin - stats.lowestBin) / stats.medianBin : 0,
-			spark: spark7d(auctionHistory(id).map((h) => [h.t, h.m] as [number, number]))
+			spark: sparks.get(id) ?? []
 		}))
 		.sort((a, b) => b.count - a.count);
 	return { lastUpdated, rows };
-}
+};

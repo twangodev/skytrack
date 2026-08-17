@@ -241,6 +241,56 @@ export async function itemSeriesJson(db: D1Database, id: string): Promise<ItemSe
 	return out;
 }
 
+// Sampled sparklines for every currently-listed product: instead of reading
+// the full 7d raw window per item (bazaarSeriesSince over ~2-4k ids would be
+// millions of rows), seek 12 evenly spaced sample times per item with a
+// correlated subquery each - the same PK-seek trick bazaarWindowChanges
+// uses, just repeated per sample instead of per first/last. ~12 index rows
+// per product regardless of how dense the raw tier is.
+const WEEK = 7 * DAY;
+const SPARK_SAMPLES = 12;
+
+async function sparkSamples(
+	db: D1Database,
+	snapshotTable: 'bazaar_snapshot' | 'auction_snapshot',
+	pointsTable: 'bazaar_points' | 'auction_points',
+	column: 'buy' | 'median',
+	now: number
+): Promise<Map<string, number[]>> {
+	const since = now - WEEK;
+	const step = WEEK / SPARK_SAMPLES;
+	// sample times end exactly at `now`; ?1 is `since`, ?2..?13 are the sample times
+	const times = Array.from({ length: SPARK_SAMPLES }, (_, k) => Math.floor(since + (k + 1) * step));
+	const cols = times
+		.map(
+			(_, k) =>
+				`(SELECT ${column} FROM ${pointsTable} p WHERE p.item = s.item AND p.tier = 0 AND p.t >= ?1 AND p.t <= ?${k + 2} ORDER BY p.t DESC LIMIT 1) AS v${k}`
+		)
+		.join(', ');
+	const { results } = await db
+		.prepare(`SELECT s.item AS id, ${cols} FROM ${snapshotTable} s`)
+		.bind(since, ...times)
+		.all<Record<string, string | number | null>>();
+	const out = new Map<string, number[]>();
+	for (const row of results) {
+		const values = times
+			.map((_, k) => row[`v${k}`])
+			.filter((v): v is number => v != null)
+			.map((v) => Number(v.toPrecision(4)));
+		out.set(row.id as string, values.length < 2 ? [] : values);
+	}
+	return out;
+}
+
+/** Trailing-7d sparkline values for every currently-listed bazaar product: 12 evenly spaced samples ending at `now`, each the latest raw (tier 0) `buy` in [now-7d, t_k]. One PK seek per sample; ~12 index rows per product. Fewer than 2 samples -> []. Values rounded to 4 significant figures (matches the old file-based spark helper). Cached under the 60s TTL (key ignores `now`). */
+export const bazaarSparks = (db: D1Database, now: number) =>
+	cached('bazaarSparks', () => sparkSamples(db, 'bazaar_snapshot', 'bazaar_points', 'buy', now));
+/** Same for currently-listed auction items, sampling `median` from auction_points tier 0. */
+export const auctionSparks = (db: D1Database, now: number) =>
+	cached('auctionSparks', () =>
+		sparkSamples(db, 'auction_snapshot', 'auction_points', 'median', now)
+	);
+
 export async function popularAuctionItems(db: D1Database, limit: number): Promise<ExampleItem[]> {
 	const [{ items }, index] = await Promise.all([getAuctionSnapshot(db), itemsIndex(db)]);
 	return Object.entries(items)

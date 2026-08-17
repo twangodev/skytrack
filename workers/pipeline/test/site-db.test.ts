@@ -2,7 +2,9 @@ import { env } from 'cloudflare:test';
 import { beforeEach, expect, test, vi } from 'vitest';
 import {
 	auctionHistory,
+	auctionSparks,
 	bazaarHistory,
+	bazaarSparks,
 	bazaarSummaryHistory,
 	bazaarWindowChanges,
 	getBazaarSnapshot,
@@ -191,4 +193,106 @@ test('getBazaarSnapshot refetches once the TTL expires', async () => {
 	} finally {
 		vi.useRealTimers();
 	}
+});
+
+// bazaarSparks/auctionSparks are cached('bazaarSparks'/'auctionSparks', ...)
+// under the same 60s TTL as the rest of db.ts, but the cache key ignores
+// `now` (per the function's doc comment), so two calls to bazaarSparks
+// within 60s of each other - even across separate test() bodies, since the
+// module-level cache Map outlives beforeEach's table resets - serve the
+// SAME stale Map regardless of what's reseeded in between. Seed every
+// scenario once and assert them all from a single bazaarSparks(...) call
+// (ditto for auctionSparks) so the cache never leaks stale expectations
+// between tests.
+test('bazaarSparks: 12 seeked tier-0 samples per snapshot-listed product, shape rules for every edge case', async () => {
+	const HOUR4 = 4 * 3_600;
+	const since = now - 7 * DAY;
+
+	// SPARK_FULL: tier-0 points every 4h across the full 7d window, strictly
+	// increasing buy, last point exactly at `now` (42 * 14400s = 604800s = 7d).
+	const fullValues = Array.from({ length: 42 }, (_, i) => i + 1);
+	const fullRows = fullValues
+		.map((v, i) => `('SPARK_FULL', 0, ${since + (i + 1) * HOUR4}, ${v}, ${v - 1})`)
+		.join(', ');
+
+	await env.DB.batch([
+		env.DB.prepare(`INSERT INTO bazaar_points (item, tier, t, buy, sell) VALUES ${fullRows}`),
+		// SPARK_SINGLE: exactly one tier-0 point in the window.
+		env.DB.prepare(
+			'INSERT INTO bazaar_points (item, tier, t, buy, sell) VALUES (?, 0, ?, ?, ?)'
+		).bind('SPARK_SINGLE', now - 1_000, 50, 49),
+		// SPARK_OLD: only tier-0 points older than 7 days.
+		env.DB.prepare(
+			'INSERT INTO bazaar_points (item, tier, t, buy, sell) VALUES (?, 0, ?, ?, ?)'
+		).bind('SPARK_OLD', now - 8 * DAY, 60, 59),
+		// SPARK_TIER_ONLY: tier 1 and tier 2 points inside the window, no tier 0 at all.
+		env.DB.prepare(
+			'INSERT INTO bazaar_points (item, tier, t, buy, sell) VALUES (?, 1, ?, ?, ?), (?, 2, ?, ?, ?)'
+		).bind('SPARK_TIER_ONLY', now - 2 * DAY, 80, 79, 'SPARK_TIER_ONLY', now - DAY, 90, 89),
+		// SPARK_NOT_LISTED: has tier-0 points but is absent from bazaar_snapshot.
+		env.DB.prepare(
+			'INSERT INTO bazaar_points (item, tier, t, buy, sell) VALUES (?, 0, ?, ?, ?)'
+		).bind('SPARK_NOT_LISTED', now - 500, 70, 69),
+		// items + snapshot rows for every listed id (SPARK_EMPTY has no points at all).
+		env.DB.prepare(
+			`INSERT INTO items (id, slug, name) VALUES
+			 ('SPARK_FULL', 'spark-full', 'Spark Full'),
+			 ('SPARK_SINGLE', 'spark-single', 'Spark Single'),
+			 ('SPARK_OLD', 'spark-old', 'Spark Old'),
+			 ('SPARK_EMPTY', 'spark-empty', 'Spark Empty'),
+			 ('SPARK_TIER_ONLY', 'spark-tier-only', 'Spark Tier Only')`
+		),
+		env.DB.prepare(
+			`INSERT INTO bazaar_snapshot (item, body, updated) VALUES
+			 ('SPARK_FULL', '{}', ${now}),
+			 ('SPARK_SINGLE', '{}', ${now}),
+			 ('SPARK_OLD', '{}', ${now}),
+			 ('SPARK_EMPTY', '{}', ${now}),
+			 ('SPARK_TIER_ONLY', '{}', ${now})`
+		)
+	]);
+
+	const sparks = await bazaarSparks(env.DB, now);
+
+	// 1. exactly 12 values, each rounded to 4 sig figs, last === newest buy (42),
+	// non-decreasing (seed buy is monotonically increasing with t).
+	const full = sparks.get('SPARK_FULL')!;
+	expect(full).toHaveLength(12);
+	expect(full[11]).toBe(42);
+	expect(full.every((v) => v === Number(v.toPrecision(4)))).toBe(true);
+	expect(full.every((v, i) => i === 0 || v >= full[i - 1])).toBe(true);
+
+	// 2. a single in-window tier-0 point -> [].
+	expect(sparks.get('SPARK_SINGLE')).toEqual([]);
+	// 3. only points older than 7 days -> [].
+	expect(sparks.get('SPARK_OLD')).toEqual([]);
+	// 4. no points at all -> [] (key present).
+	expect(sparks.has('SPARK_EMPTY')).toBe(true);
+	expect(sparks.get('SPARK_EMPTY')).toEqual([]);
+	// 5. points exist but the item isn't snapshot-listed -> absent from the map.
+	expect(sparks.has('SPARK_NOT_LISTED')).toBe(false);
+	// 6. tier 1/2 points inside the window are ignored; tier-0-only listed
+	// product with no tier-0 points -> [].
+	expect(sparks.get('SPARK_TIER_ONLY')).toEqual([]);
+});
+
+test('auctionSparks samples the median column (not lowest) for snapshot-listed auction items', async () => {
+	await env.DB.batch([
+		env.DB.prepare(
+			"INSERT INTO items (id, slug, name) VALUES ('SPARK_AUCTION', 'spark-auction', 'Spark Auction')"
+		),
+		env.DB.prepare(
+			"INSERT INTO auction_snapshot (item, body, updated) VALUES ('SPARK_AUCTION', '{}', ?)"
+		).bind(now),
+		env.DB.prepare(
+			'INSERT INTO auction_points (item, tier, t, lowest, median, count) VALUES (?, 0, ?, ?, ?, ?), (?, 0, ?, ?, ?, ?)'
+		).bind('SPARK_AUCTION', now - DAY, 100, 200, 5, 'SPARK_AUCTION', now, 150, 250, 6)
+	]);
+
+	const sparks = await auctionSparks(env.DB, now);
+	const values = sparks.get('SPARK_AUCTION')!;
+
+	expect(values).toEqual([200, 250]); // medians, in time order
+	expect(values).not.toContain(100); // lowest values must not leak in
+	expect(values).not.toContain(150);
 });

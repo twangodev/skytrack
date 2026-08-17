@@ -1,11 +1,17 @@
 // Data pipeline: the port of scripts/fetch-data.ts orchestration.
-// Three crons, dispatched on controller.cron:
-//   */5 * * * *   bazaar refresh (light JSON; sub-hourly crons get 30s CPU)
-//   10 */3 * * *  official items + full auction crawl (NBT-heavy; >=1h
-//                 interval crons get 15min CPU - the crawl needs minutes)
+// Three crons, dispatched on controller.cron (see crons.ts):
+//   */5 * * * *   bazaar refresh (light JSON)
+//   10 */3 * * *  official items + full auction crawl (NBT-heavy)
 //   30 4 * * *    rollup + snapshot pruning
+// wrangler.jsonc's limits.cpu_ms is 300 000 (5 min) for every invocation - the
+// crawl must fit that; sub-hourly crons would otherwise default to 30 s.
 import type { ZodType } from 'zod';
-import { bazaarResponse, auctionsPage, itemsResponse, type RawAuction } from '../../../src/lib/hypixel/types';
+import {
+	bazaarResponse,
+	auctionsPage,
+	itemsResponse,
+	type RawAuction
+} from '../../../src/lib/hypixel/types';
 import { BAZAAR_URL, AUCTIONS_URL, ITEMS_URL } from '../../../src/lib/hypixel/endpoints';
 import { aggregateBins, toSnapshot, type DecodedBin } from '../../../src/lib/market/aggregate';
 import { itemIdFromBytes } from '../../../src/lib/hypixel/nbt';
@@ -17,6 +23,7 @@ import {
 	assertPopulated,
 	type ItemMeta
 } from './db';
+import { CRONS } from './crons';
 
 interface Env {
 	DB: D1Database;
@@ -43,7 +50,9 @@ async function fetchJson<T>(url: string, schema: ZodType<T>, retries = 3): Promi
 
 async function refreshBazaar(env: Env): Promise<void> {
 	const data = await fetchJson(BAZAAR_URL, bazaarResponse);
-	const products = Object.fromEntries(Object.entries(data.products).map(([id, p]) => [id, toSnapshot(p)]));
+	const products = Object.fromEntries(
+		Object.entries(data.products).map(([id, p]) => [id, toSnapshot(p)])
+	);
 	await writeBazaarRun(env.DB, data.lastUpdated, products);
 	console.log(JSON.stringify({ event: 'bazaar', products: Object.keys(products).length }));
 }
@@ -67,14 +76,28 @@ async function refreshAuctions(env: Env): Promise<void> {
 	}
 
 	const first = await fetchJson(`${AUCTIONS_URL}?page=0`, auctionsPage);
-	const pages = [first];
+	// Dedupe into the map as each concurrency chunk resolves rather than
+	// retaining every parsed page: the crawl is tens of thousands of listings
+	// spread over ~1k-listing pages, and keeping the page objects alive
+	// alongside the deduped set holds a second copy of all of them for no
+	// benefit. Behaviour is unchanged - later pages still win a uuid collision
+	// (as in the old `new Map(pages.flatMap(...))`) and first-insertion order
+	// is preserved.
+	const byUuid = new Map<string, RawAuction>();
+	const collect = (page: { auctions: RawAuction[] }) => {
+		for (const a of page.auctions) byUuid.set(a.uuid, a);
+	};
+	collect(first);
 	const remaining = Array.from({ length: first.totalPages - 1 }, (_, i) => i + 1);
 	const concurrency = 6;
 	for (let i = 0; i < remaining.length; i += concurrency) {
 		const chunk = remaining.slice(i, i + concurrency);
-		pages.push(...(await Promise.all(chunk.map((page) => fetchJson(`${AUCTIONS_URL}?page=${page}`, auctionsPage)))));
+		const fetched = await Promise.all(
+			chunk.map((page) => fetchJson(`${AUCTIONS_URL}?page=${page}`, auctionsPage))
+		);
+		for (const page of fetched) collect(page);
 	}
-	const auctions = [...new Map(pages.flatMap((p) => p.auctions).map((a) => [a.uuid, a])).values()];
+	const auctions = [...byUuid.values()];
 	const bins = auctions.filter((a) => a.bin === true && a.claimed !== true);
 
 	const decoded: DecodedBin[] = [];
@@ -101,7 +124,13 @@ async function refreshAuctions(env: Env): Promise<void> {
 	const aggregated = aggregateBins(decoded);
 	await writeAuctionRun(env.DB, first.lastUpdated, aggregated, items);
 	console.log(
-		JSON.stringify({ event: 'auctions', total: auctions.length, bins: bins.length, failed, items: Object.keys(aggregated).length })
+		JSON.stringify({
+			event: 'auctions',
+			total: auctions.length,
+			bins: bins.length,
+			failed,
+			items: Object.keys(aggregated).length
+		})
 	);
 }
 
@@ -117,11 +146,11 @@ export default {
 		if (env.BOOTSTRAP !== '1') await assertPopulated(env.DB);
 		// a thrown error marks the invocation failed in the CF dashboard
 		switch (controller.cron) {
-			case '*/5 * * * *':
+			case CRONS.bazaar:
 				return refreshBazaar(env);
-			case '10 */3 * * *':
+			case CRONS.auctions:
 				return refreshAuctions(env);
-			case '30 4 * * *':
+			case CRONS.maintenance:
 				return maintain(env);
 			default:
 				throw new Error(`unknown cron: ${controller.cron}`);

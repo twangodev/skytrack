@@ -1,4 +1,10 @@
-import { requireDb, getBazaarSnapshot, getItems, bazaarWindowChanges, bazaarSeriesSince } from '$lib/server/db';
+import {
+	requireDb,
+	getBazaarSnapshot,
+	getItems,
+	bazaarWindowChanges,
+	bazaarSeriesSince
+} from '$lib/server/db';
 import { downsample } from '$lib/server/spark';
 import { slugFromId } from '$lib/slug';
 import { titleCase } from '$lib/format';
@@ -18,9 +24,13 @@ const WINDOWS = [
 	['w1', 604_800]
 ] as const;
 
-export const load: PageServerLoad = async ({ platform }) => {
+export const load: PageServerLoad = async ({ platform, setHeaders }) => {
 	const db = requireDb(platform);
-	const [{ lastUpdated, products }, items] = await Promise.all([getBazaarSnapshot(db), getItems(db)]);
+	setHeaders({ 'cache-control': 'public, max-age=0, s-maxage=60' });
+	const [{ lastUpdated, products }, items] = await Promise.all([
+		getBazaarSnapshot(db),
+		getItems(db)
+	]);
 	const now = Math.floor(Date.now() / 1000);
 
 	const windows = Object.fromEntries(

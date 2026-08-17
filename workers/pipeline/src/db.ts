@@ -30,7 +30,9 @@ export async function batchChunked(db: D1Database, stmts: D1PreparedStatement[])
 
 const metaStmt = (db: D1Database, key: string, value: string) =>
 	db
-		.prepare('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+		.prepare(
+			'INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
+		)
 		.bind(key, value);
 
 // name only set on first sight; the official items refresh corrects it later.
@@ -56,7 +58,9 @@ export async function writeBazaarRun(
 	const snap = db.prepare(
 		'INSERT INTO bazaar_snapshot (item, body, updated) VALUES (?, ?, ?) ON CONFLICT(item) DO UPDATE SET body = excluded.body, updated = excluded.updated'
 	);
-	const point = db.prepare('INSERT OR IGNORE INTO bazaar_points (item, tier, t, buy, sell) VALUES (?, 0, ?, ?, ?)');
+	const point = db.prepare(
+		'INSERT OR IGNORE INTO bazaar_points (item, tier, t, buy, sell) VALUES (?, 0, ?, ?, ?)'
+	);
 	const stmts: D1PreparedStatement[] = [];
 	for (const [id, s] of Object.entries(products)) {
 		stmts.push(itemStmt(db, id, titleCase(id)));
@@ -85,7 +89,9 @@ export async function writeAuctionRun(
 	// owned by a DIFFERENT id is dropped with a logged event instead of
 	// inserted, so one bad catalogue id can't take down every other item in
 	// this run.
-	const existingRows = await db.prepare('SELECT id, slug FROM items').all<{ id: string; slug: string }>();
+	const existingRows = await db
+		.prepare('SELECT id, slug FROM items')
+		.all<{ id: string; slug: string }>();
 	const slugOwners = new Map(existingRows.results.map((r) => [r.slug, r.id]));
 	for (const id of Object.keys(items)) {
 		const slug = slugFromId(id);
@@ -104,12 +110,16 @@ export async function writeAuctionRun(
 			continue;
 		}
 		slugOwners.set(slug, id);
-		stmts.push(official.bind(id, slug, meta.name, meta.tier ?? null, meta.category ?? null, meta.npc ?? null));
+		stmts.push(
+			official.bind(id, slug, meta.name, meta.tier ?? null, meta.category ?? null, meta.npc ?? null)
+		);
 	}
 	const snap = db.prepare(
 		'INSERT INTO auction_snapshot (item, body, updated) VALUES (?, ?, ?) ON CONFLICT(item) DO UPDATE SET body = excluded.body, updated = excluded.updated'
 	);
-	const point = db.prepare('INSERT OR IGNORE INTO auction_points (item, tier, t, lowest, median, count) VALUES (?, 0, ?, ?, ?, ?)');
+	const point = db.prepare(
+		'INSERT OR IGNORE INTO auction_points (item, tier, t, lowest, median, count) VALUES (?, 0, ?, ?, ?, ?)'
+	);
 	for (const [id, stats] of Object.entries(items)) {
 		stmts.push(itemStmt(db, id, stats.name));
 		stmts.push(snap.bind(id, JSON.stringify(stats), t));
@@ -137,9 +147,30 @@ interface RollupSpec {
 // rows, uncomfortably close to the isolate's 128 MB limit; 6h keeps it to
 // ~129k while staying bucket-aligned (a multiple of HOUR).
 const ROLLUPS: RollupSpec[] = [
-	{ table: 'bazaar_points', fromTier: 0, intoTier: 1, windowSeconds: RAW_WINDOW, bucketSeconds: HOUR, sliceSeconds: 6 * HOUR },
-	{ table: 'bazaar_points', fromTier: 1, intoTier: 2, windowSeconds: HOURLY_WINDOW, bucketSeconds: DAY, sliceSeconds: DAY },
-	{ table: 'auction_points', fromTier: 0, intoTier: 2, windowSeconds: RAW_WINDOW, bucketSeconds: DAY, sliceSeconds: DAY }
+	{
+		table: 'bazaar_points',
+		fromTier: 0,
+		intoTier: 1,
+		windowSeconds: RAW_WINDOW,
+		bucketSeconds: HOUR,
+		sliceSeconds: 6 * HOUR
+	},
+	{
+		table: 'bazaar_points',
+		fromTier: 1,
+		intoTier: 2,
+		windowSeconds: HOURLY_WINDOW,
+		bucketSeconds: DAY,
+		sliceSeconds: DAY
+	},
+	{
+		table: 'auction_points',
+		fromTier: 0,
+		intoTier: 2,
+		windowSeconds: RAW_WINDOW,
+		bucketSeconds: DAY,
+		sliceSeconds: DAY
+	}
 ];
 
 export async function rollupAll(db: D1Database, now: number): Promise<void> {
@@ -163,11 +194,23 @@ async function rollupTier(db: D1Database, spec: RollupSpec, now: number): Promis
 	// comment for the row-count reasoning) - keeps each query far under D1's
 	// 30s limit and the isolate's memory. Crash-safe: rows are only deleted
 	// after their buckets are written, and rewriting a bucket from the same
-	// rows is a no-op (INSERT OR REPLACE of identical values).
-	for (let start = Math.floor(oldest.t / sliceSeconds) * sliceSeconds; start < cutoff; start += sliceSeconds) {
+	// rows is a no-op (INSERT OR REPLACE of identical values). The cost of
+	// that ordering is a transient double count: if the run dies between an
+	// inserted bucket chunk and the final DELETE, the tier-0 sources and their
+	// tier-1/2 buckets coexist until the next run. Only *SummaryHistory (all
+	// tiers, unfiltered) reads both, the tiered read paths window them apart,
+	// and the next maintenance run re-deletes the sources - so it self-heals
+	// within a day.
+	for (
+		let start = Math.floor(oldest.t / sliceSeconds) * sliceSeconds;
+		start < cutoff;
+		start += sliceSeconds
+	) {
 		const end = Math.min(start + sliceSeconds, cutoff);
 		const { results } = await db
-			.prepare(`SELECT ${columns} FROM ${table} WHERE tier = ? AND t >= ? AND t < ? ORDER BY item, t`)
+			.prepare(
+				`SELECT ${columns} FROM ${table} WHERE tier = ? AND t >= ? AND t < ? ORDER BY item, t`
+			)
 			.bind(fromTier, start, end)
 			.all<Record<string, number | string>>();
 		if (results.length === 0) continue;
@@ -176,15 +219,24 @@ async function rollupTier(db: D1Database, spec: RollupSpec, now: number): Promis
 		for (const row of results) {
 			const point = isBazaar
 				? { t: row.t as number, b: row.buy as number, s: row.sell as number }
-				: { t: row.t as number, l: row.lowest as number, m: row.median as number, c: row.count as number };
+				: {
+						t: row.t as number,
+						l: row.lowest as number,
+						m: row.median as number,
+						c: row.count as number
+					};
 			const list = byItem.get(row.item as string) ?? [];
 			list.push(point);
 			byItem.set(row.item as string, list);
 		}
 
 		const insert = isBazaar
-			? db.prepare('INSERT OR REPLACE INTO bazaar_points (item, tier, t, buy, sell) VALUES (?, ?, ?, ?, ?)')
-			: db.prepare('INSERT OR REPLACE INTO auction_points (item, tier, t, lowest, median, count) VALUES (?, ?, ?, ?, ?, ?)');
+			? db.prepare(
+					'INSERT OR REPLACE INTO bazaar_points (item, tier, t, buy, sell) VALUES (?, ?, ?, ?, ?)'
+				)
+			: db.prepare(
+					'INSERT OR REPLACE INTO auction_points (item, tier, t, lowest, median, count) VALUES (?, ?, ?, ?, ?, ?)'
+				);
 		const stmts: D1PreparedStatement[] = [];
 		for (const [item, points] of byItem) {
 			const rolled = isBazaar
@@ -194,27 +246,54 @@ async function rollupTier(db: D1Database, spec: RollupSpec, now: number): Promis
 				stmts.push(
 					isBazaar
 						? insert.bind(item, intoTier, p.t, (p as BazaarPoint).b, (p as BazaarPoint).s)
-						: insert.bind(item, intoTier, p.t, (p as AuctionPoint).l, (p as AuctionPoint).m, (p as AuctionPoint).c)
+						: insert.bind(
+								item,
+								intoTier,
+								p.t,
+								(p as AuctionPoint).l,
+								(p as AuctionPoint).m,
+								(p as AuctionPoint).c
+							)
 				);
 			}
 		}
-		stmts.push(db.prepare(`DELETE FROM ${table} WHERE tier = ? AND t >= ? AND t < ?`).bind(fromTier, start, end));
+		stmts.push(
+			db
+				.prepare(`DELETE FROM ${table} WHERE tier = ? AND t >= ? AND t < ?`)
+				.bind(fromTier, start, end)
+		);
 		await batchChunked(db, stmts);
 	}
 }
 
+// The MAX(updated) >= ?1 guard makes each DELETE a no-op when the entire
+// table is stale (kind hasn't run) - correct pruning when it isn't. Without
+// it a single failed crawl day would empty the snapshot table and take the
+// whole catalogue off the site until the next successful run.
 export async function pruneStaleSnapshots(db: D1Database, now: number): Promise<void> {
 	await db.batch([
-		db.prepare('DELETE FROM bazaar_snapshot WHERE updated < ?').bind(now - DAY),
-		db.prepare('DELETE FROM auction_snapshot WHERE updated < ?').bind(now - DAY)
+		db
+			.prepare(
+				'DELETE FROM bazaar_snapshot WHERE updated < ?1 AND (SELECT MAX(updated) FROM bazaar_snapshot) >= ?1'
+			)
+			.bind(now - DAY),
+		db
+			.prepare(
+				'DELETE FROM auction_snapshot WHERE updated < ?1 AND (SELECT MAX(updated) FROM auction_snapshot) >= ?1'
+			)
+			.bind(now - DAY)
 	]);
 }
 
 // Replaces the BOOTSTRAP/first-deploy machinery: after the one-time history
 // import the DB is never legitimately empty, so empty means misconfiguration.
 export async function assertPopulated(db: D1Database): Promise<void> {
-	const row = await db.prepare('SELECT EXISTS(SELECT 1 FROM bazaar_points) AS populated').first<{ populated: number }>();
+	const row = await db
+		.prepare('SELECT EXISTS(SELECT 1 FROM bazaar_points) AS populated')
+		.first<{ populated: number }>();
 	if (!row?.populated) {
-		throw new Error('bazaar_points is empty - run the history import first (or set BOOTSTRAP=1 to start a fresh chain)');
+		throw new Error(
+			'bazaar_points is empty - run the history import first (or set BOOTSTRAP=1 to start a fresh chain)'
+		);
 	}
 }

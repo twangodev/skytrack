@@ -30,7 +30,11 @@ export const bazaarResponse = z.object({
 	products: z.record(z.string(), bazaarProduct)
 });
 
-export const rawAuction = z.looseObject({
+// z.object, not a passthrough schema: zod strips undeclared keys on parse, so
+// a full auction crawl retains only the seven fields below per listing instead
+// of the whole Hypixel payload (item_lore, bids, auctioneer, ...) for every one
+// of the tens of thousands of listings held in memory at once.
+export const rawAuction = z.object({
 	uuid: z.string(),
 	item_name: z.string(),
 	tier: z.string(),
@@ -40,7 +44,7 @@ export const rawAuction = z.looseObject({
 	claimed: z.boolean().optional()
 });
 
-export const auctionsPage = z.looseObject({
+export const auctionsPage = z.object({
 	success: z.literal(true),
 	page: z.number(),
 	totalPages: z.number(),
@@ -48,7 +52,7 @@ export const auctionsPage = z.looseObject({
 	auctions: z.array(rawAuction)
 });
 
-export const resourceItem = z.looseObject({
+export const resourceItem = z.object({
 	id: z.string(),
 	name: z.string(),
 	tier: z.string().optional(),
@@ -56,7 +60,7 @@ export const resourceItem = z.looseObject({
 	npc_sell_price: z.number().optional()
 });
 
-export const itemsResponse = z.looseObject({
+export const itemsResponse = z.object({
 	success: z.literal(true),
 	lastUpdated: z.number(),
 	items: z.array(resourceItem)

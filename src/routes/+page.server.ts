@@ -11,8 +11,11 @@ import { titleCase } from '$lib/format';
 import { flipQuote, isFlipOpportunity } from '$lib/market/flips';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ platform }) => {
+export const load: PageServerLoad = async ({ platform, setHeaders }) => {
 	const db = requireDb(platform);
+	// edge TTL; only honoured once a zone Cache Rule caches Worker responses
+	// (Task 12)
+	setHeaders({ 'cache-control': 'public, max-age=0, s-maxage=60' });
 	const [bazaar, auctions, items] = await Promise.all([
 		getBazaarSnapshot(db),
 		getAuctionSnapshot(db),

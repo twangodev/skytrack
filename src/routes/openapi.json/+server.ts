@@ -35,7 +35,7 @@ export const GET: RequestHandler = () => {
 			title: `${site.title} API`,
 			version: '1.0.0',
 			description:
-				'Static, CDN-served endpoints for Hypixel Skyblock market history. Everything is regenerated roughly every 15 minutes by the data pipeline; there is no rate limit beyond the CDN. Slugs are the item id lowercased with underscores as hyphens and colons as dots (ENCHANTED_DIAMOND becomes enchanted-diamond). Data comes exclusively from the official Hypixel API. Not affiliated with Hypixel Inc.'
+				'Endpoints for Hypixel Skyblock market history, served from the market database (bazaar refreshed every 5 minutes, auctions about every 3 hours) and cached at the edge; there is no auth and no rate limit beyond the CDN. Slugs are the item id lowercased with underscores as hyphens and colons as dots (ENCHANTED_DIAMOND becomes enchanted-diamond). Data comes exclusively from the official Hypixel API. Not affiliated with Hypixel Inc.'
 		},
 		servers: [{ url: site.url }],
 		paths: {

@@ -57,10 +57,11 @@
 	<div>
 		<h1 class="text-2xl font-medium">API</h1>
 		<p class="mt-2 text-sm leading-relaxed text-muted">
-			Everything on this site is also available as data. The endpoints below are static files
-			regenerated about every 15 minutes and served from the CDN, so there is no auth and no rate
-			limit beyond it. Slugs are the item id lowercased, with underscores as hyphens and colons as
-			dots: <code class="rounded bg-surface px-1 py-0.5 font-mono text-xs">ENCHANTED_DIAMOND</code>
+			Everything on this site is also available as data. The endpoints below are rendered on demand
+			from the market database (bazaar refreshed every 5 minutes, auctions about every 3 hours) and
+			cached at the edge, so there is no auth and no rate limit beyond it. Slugs are the item id
+			lowercased, with underscores as hyphens and colons as dots:
+			<code class="rounded bg-surface px-1 py-0.5 font-mono text-xs">ENCHANTED_DIAMOND</code>
 			becomes
 			<code class="rounded bg-surface px-1 py-0.5 font-mono text-xs">enchanted-diamond</code>.
 		</p>
@@ -82,6 +83,6 @@
 
 	<p class="text-xs text-muted">
 		Data comes exclusively from the official Hypixel API and refreshes on the pipeline cadence:
-		bazaar every 15 minutes, auctions about every 3 hours. Not affiliated with Hypixel Inc.
+		bazaar every 5 minutes, auctions about every 3 hours. Not affiliated with Hypixel Inc.
 	</p>
 </div>

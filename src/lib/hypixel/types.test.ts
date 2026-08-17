@@ -35,8 +35,13 @@ describe('bazaarResponse', () => {
 	});
 });
 
+// The auction schemas are strict z.object (not passthrough) on purpose: a full
+// crawl parses tens of thousands of listings, and Hypixel sends a large
+// `item_lore`/`bids`/`auctioneer` payload with each one. Stripping the
+// undeclared keys at parse time is what keeps the retained crawl set small
+// enough for the isolate.
 describe('auctionsPage', () => {
-	test('parses and tolerates extra fields', () => {
+	test('parses, keeps every declared field, and strips unknown keys', () => {
 		const parsed = auctionsPage.parse({
 			success: true,
 			page: 0,
@@ -51,11 +56,25 @@ describe('auctionsPage', () => {
 					starting_bid: 100000,
 					item_bytes: 'H4sIA...',
 					bin: true,
-					auctioneer: 'someone'
+					auctioneer: 'someone',
+					item_lore: 'a very long lore blob'
 				}
 			]
 		});
-		expect(parsed.auctions[0].bin).toBe(true);
+		// declared fields survive verbatim (absent optionals stay absent)
+		expect(parsed.auctions[0]).toEqual({
+			uuid: 'abc',
+			item_name: 'Aspect of the End',
+			tier: 'RARE',
+			starting_bid: 100000,
+			item_bytes: 'H4sIA...',
+			bin: true
+		});
+		// undeclared keys are dropped, at both levels
+		expect(Object.keys(parsed.auctions[0])).not.toContain('auctioneer');
+		expect(Object.keys(parsed.auctions[0])).not.toContain('item_lore');
+		expect(Object.keys(parsed)).not.toContain('extra_field');
+		expect(parsed.totalPages).toBe(42);
 	});
 });
 
@@ -68,6 +87,11 @@ describe('itemsResponse', () => {
 				{ id: 'ASPECT_OF_THE_END', name: 'Aspect of the End', tier: 'RARE', material: 'SWORD' }
 			]
 		});
-		expect(parsed.items[0].name).toBe('Aspect of the End');
+		expect(parsed.items[0]).toEqual({
+			id: 'ASPECT_OF_THE_END',
+			name: 'Aspect of the End',
+			tier: 'RARE'
+		});
+		expect(Object.keys(parsed.items[0])).not.toContain('material');
 	});
 });

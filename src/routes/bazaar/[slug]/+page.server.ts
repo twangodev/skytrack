@@ -11,7 +11,7 @@ import { summarizeHistory } from '$lib/market/history-summary';
 import { titleCase } from '$lib/format';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ params, platform }) => {
+export const load: PageServerLoad = async ({ params, platform, setHeaders }) => {
 	const db = requireDb(platform);
 	const id = await resolveBazaarId(db, params.slug);
 	if (!id) error(404, 'Unknown product');
@@ -21,13 +21,18 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 		bazaarHistory(db, id),
 		bazaarSummaryHistory(db, id)
 	]);
+	// the TTL cache can lapse between resolveBazaarId and this read, so a
+	// product delisted in between is gone from the snapshot by now
+	const snapshot = products[id];
+	if (!snapshot) error(404, 'Unknown product');
+	setHeaders({ 'cache-control': 'public, max-age=0, s-maxage=60' });
 	const meta = items[id];
 	return {
 		id,
 		slug: params.slug,
 		name: meta?.name ?? titleCase(id),
 		tier: meta?.tier,
-		snapshot: products[id],
+		snapshot,
 		history,
 		summary: summarizeHistory(summaryHistory.map((point) => ({ t: point.t, value: point.b }))),
 		lastUpdated

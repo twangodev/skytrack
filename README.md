@@ -21,6 +21,6 @@ Then:
 bun run dev
 ```
 
-For deeper history, `bun scripts/import-history.ts` emits SQL files you can apply with `bunx wrangler d1 execute skytrack --local --persist-to .wrangler/state --file=<file> -c workers/pipeline/wrangler.jsonc`.
+For history depth, export production D1 (`bunx wrangler d1 export skytrack --remote --output=history.sql -c workers/pipeline/wrangler.jsonc`) and apply it locally with `bunx wrangler d1 execute skytrack --local --persist-to .wrangler/state --file=history.sql -c workers/pipeline/wrangler.jsonc`.
 
 Not affiliated with Hypixel Inc. or Mojang.

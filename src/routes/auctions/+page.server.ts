@@ -2,8 +2,9 @@ import { requireDb, getAuctionSnapshot, auctionSparks } from '$lib/server/db';
 import { slugFromId } from '$lib/slug';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ platform }) => {
+export const load: PageServerLoad = async ({ platform, setHeaders }) => {
 	const db = requireDb(platform);
+	setHeaders({ 'cache-control': 'public, max-age=0, s-maxage=60' });
 	const now = Math.floor(Date.now() / 1000);
 	const [{ lastUpdated, items }, sparks] = await Promise.all([
 		getAuctionSnapshot(db),

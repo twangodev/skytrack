@@ -1,8 +1,5 @@
 .svelte-kit/
 build/
 node_modules/
-src/lib/data/
-static/data/
-src/lib/proto/
 bun.lock
 docs/

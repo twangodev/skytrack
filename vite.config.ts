@@ -14,6 +14,9 @@ export default defineConfig({
 	},
 	test: {
 		environment: 'node',
-		include: ['src/**/*.test.ts', 'scripts/**/*.test.ts']
+		// workers/pipeline/src/*.test.ts: node-side pipeline tests (crons.test.ts
+		// reads wrangler.jsonc from disk). The workerd suite in workers/pipeline
+		// only includes test/**, so nothing runs twice.
+		include: ['src/**/*.test.ts', 'scripts/**/*.test.ts', 'workers/pipeline/src/*.test.ts']
 	}
 });

@@ -4,9 +4,13 @@ import { titleCase } from '$lib/format';
 import { flipQuote } from '$lib/market/flips';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ platform }) => {
+export const load: PageServerLoad = async ({ platform, setHeaders }) => {
 	const db = requireDb(platform);
-	const [{ lastUpdated, products }, items] = await Promise.all([getBazaarSnapshot(db), getItems(db)]);
+	setHeaders({ 'cache-control': 'public, max-age=0, s-maxage=60' });
+	const [{ lastUpdated, products }, items] = await Promise.all([
+		getBazaarSnapshot(db),
+		getItems(db)
+	]);
 	const rows = Object.entries(products)
 		.filter(([, snap]) => snap.qs.bp > 0 && snap.qs.sp > 0)
 		.map(([id, snap]) => {

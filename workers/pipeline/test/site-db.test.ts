@@ -34,17 +34,27 @@ beforeEach(async () => {
 	]);
 
 	const stmts = [
-		env.DB.prepare("INSERT INTO items (id, slug, name) VALUES ('WHEAT', 'wheat', 'Wheat'), ('OLD_ITEM', 'old-item', 'Old Item')"),
+		env.DB.prepare(
+			"INSERT INTO items (id, slug, name) VALUES ('WHEAT', 'wheat', 'Wheat'), ('OLD_ITEM', 'old-item', 'Old Item')"
+		),
 		env.DB.prepare("INSERT INTO bazaar_snapshot (item, body, updated) VALUES ('WHEAT', ?, ?)").bind(
 			JSON.stringify({ qs: { bp: 10, sp: 9, bmw: 500000, smw: 400000 } }),
 			now
 		),
-		env.DB.prepare("INSERT INTO meta (key, value) VALUES ('bazaar_updated', ?)").bind(String(now * 1000)),
-		// daily point (old), hourly point (3d ago), raw points (now-ish and 2d ago)
+		env.DB.prepare("INSERT INTO meta (key, value) VALUES ('bazaar_updated', ?)").bind(
+			String(now * 1000)
+		),
+		// Ages match what the rollup can actually produce: the hourly tier only
+		// ever holds points that have aged out of the 90d raw window, so its
+		// newest row here is 95d old (an `t >= now - 7d` hourly row is
+		// impossible). daily 100d, hourly 95/99/101/103d, raw now-ish and 2d.
 		env.DB.prepare(
 			`INSERT INTO bazaar_points (item, tier, t, buy, sell) VALUES
 			 ('WHEAT', 2, ${now - 100 * DAY}, 5, 4),
-			 ('WHEAT', 1, ${now - 3 * DAY}, 7, 6),
+			 ('WHEAT', 1, ${now - 95 * DAY}, 7, 6),
+			 ('WHEAT', 1, ${now - 99 * DAY}, 6.5, 5.5),
+			 ('WHEAT', 1, ${now - 101 * DAY}, 6.2, 5.2),
+			 ('WHEAT', 1, ${now - 103 * DAY}, 6, 5),
 			 ('WHEAT', 0, ${now - 2 * DAY}, 8, 7),
 			 ('WHEAT', 0, ${now - 600}, 10, 9),
 			 ('WHEAT', 0, ${now - 300}, 11, 10)`
@@ -53,20 +63,26 @@ beforeEach(async () => {
 	await env.DB.batch(stmts);
 });
 
-test('bazaarHistory caps tiers: daily all, hourly 7d, raw 24h', async () => {
+test('bazaarHistory caps tiers: daily all, hourly 7d of its own tail, raw 24h', async () => {
 	const h = await bazaarHistory(env.DB, 'WHEAT');
-	// exact ascending order, not a self-referential sort check: the 2d-old raw
-	// point (t = now - 2*DAY, b = 8) is excluded by the 24h raw cap.
+	// Exact ascending order, not a self-referential sort check. Excluded:
+	// the 2d-old raw point (b = 8, past the 24h raw cap) and the 103d-old
+	// hourly point (b = 6), which is older than the hourly tier's own newest
+	// point (95d) minus 7 days.
 	expect(h).toEqual([
+		{ t: now - 101 * DAY, b: 6.2, s: 5.2 },
 		{ t: now - 100 * DAY, b: 5, s: 4 },
-		{ t: now - 3 * DAY, b: 7, s: 6 },
+		{ t: now - 99 * DAY, b: 6.5, s: 5.5 },
+		{ t: now - 95 * DAY, b: 7, s: 6 },
 		{ t: now - 600, b: 10, s: 9 },
 		{ t: now - 300, b: 11, s: 10 }
 	]);
 });
 
-test('bazaarSummaryHistory returns every tier and point', async () => {
-	expect((await bazaarSummaryHistory(env.DB, 'WHEAT')).length).toBe(5);
+test('bazaarSummaryHistory returns every tier and point, windows ignored', async () => {
+	const all = await bazaarSummaryHistory(env.DB, 'WHEAT');
+	// every seeded row, including the two bazaarHistory windows out
+	expect(new Set(all.map((p) => p.b))).toEqual(new Set([5, 7, 6.5, 6.2, 6, 8, 10, 11]));
 });
 
 test('slug resolution is kind-scoped by snapshot presence', async () => {
@@ -102,8 +118,12 @@ test('itemSeriesJson hourly tier keeps only 4h-aligned points (t % 14400 = 0)', 
 	const aligned = 14_400 * 12_345; // multiple of 14400 -> included
 	const misaligned = aligned + 3_600; // +1h -> not a multiple of 14400 -> excluded
 	await env.DB.batch([
-		env.DB.prepare('INSERT INTO bazaar_points (item, tier, t, buy, sell) VALUES (?, 1, ?, ?, ?)').bind('HOURLY_TEST', aligned, 50, 40),
-		env.DB.prepare('INSERT INTO bazaar_points (item, tier, t, buy, sell) VALUES (?, 1, ?, ?, ?)').bind('HOURLY_TEST', misaligned, 60, 50)
+		env.DB.prepare(
+			'INSERT INTO bazaar_points (item, tier, t, buy, sell) VALUES (?, 1, ?, ?, ?)'
+		).bind('HOURLY_TEST', aligned, 50, 40),
+		env.DB.prepare(
+			'INSERT INTO bazaar_points (item, tier, t, buy, sell) VALUES (?, 1, ?, ?, ?)'
+		).bind('HOURLY_TEST', misaligned, 60, 50)
 	]);
 	const json = await itemSeriesJson(env.DB, 'HOURLY_TEST');
 	expect(json.bazaar!.hourly).toEqual([[aligned, 50, 40]]);
@@ -116,22 +136,33 @@ test('itemSeriesJson hourly tier keeps only 4h-aligned points (t % 14400 = 0)', 
 // comfortably inside/outside the windows) would not catch it.
 test('bazaarHistory includes raw points exactly at the 24h cap, excludes just past it', async () => {
 	await env.DB.batch([
-		env.DB.prepare('INSERT INTO bazaar_points (item, tier, t, buy, sell) VALUES (?, 0, ?, ?, ?)').bind('WHEAT', now - DAY, 20, 19),
-		env.DB.prepare('INSERT INTO bazaar_points (item, tier, t, buy, sell) VALUES (?, 0, ?, ?, ?)').bind('WHEAT', now - DAY - 1, 21, 20)
+		env.DB.prepare(
+			'INSERT INTO bazaar_points (item, tier, t, buy, sell) VALUES (?, 0, ?, ?, ?)'
+		).bind('WHEAT', now - DAY, 20, 19),
+		env.DB.prepare(
+			'INSERT INTO bazaar_points (item, tier, t, buy, sell) VALUES (?, 0, ?, ?, ?)'
+		).bind('WHEAT', now - DAY - 1, 21, 20)
 	]);
 	const points = (await bazaarHistory(env.DB, 'WHEAT')).map((p) => [p.t, p.b]);
 	expect(points).toContainEqual([now - DAY, 20]);
 	expect(points).not.toContainEqual([now - DAY - 1, 21]);
 });
 
-test('bazaarHistory includes hourly points exactly at the 7d cap, excludes just past it', async () => {
+// The hourly cap is relative to the hourly tier's newest point, not to `now`:
+// the seed's newest tier-1 row is 95d old, so the cap sits at 102d.
+test('bazaarHistory includes hourly points exactly at the newest-minus-7d cap, excludes just past it', async () => {
+	const cap = now - 102 * DAY; // (now - 95*DAY) - 7*DAY
 	await env.DB.batch([
-		env.DB.prepare('INSERT INTO bazaar_points (item, tier, t, buy, sell) VALUES (?, 1, ?, ?, ?)').bind('WHEAT', now - 7 * DAY, 30, 29),
-		env.DB.prepare('INSERT INTO bazaar_points (item, tier, t, buy, sell) VALUES (?, 1, ?, ?, ?)').bind('WHEAT', now - 7 * DAY - 1, 31, 30)
+		env.DB.prepare(
+			'INSERT INTO bazaar_points (item, tier, t, buy, sell) VALUES (?, 1, ?, ?, ?)'
+		).bind('WHEAT', cap, 30, 29),
+		env.DB.prepare(
+			'INSERT INTO bazaar_points (item, tier, t, buy, sell) VALUES (?, 1, ?, ?, ?)'
+		).bind('WHEAT', cap - 1, 31, 30)
 	]);
 	const points = (await bazaarHistory(env.DB, 'WHEAT')).map((p) => [p.t, p.b]);
-	expect(points).toContainEqual([now - 7 * DAY, 30]);
-	expect(points).not.toContainEqual([now - 7 * DAY - 1, 31]);
+	expect(points).toContainEqual([cap, 30]);
+	expect(points).not.toContainEqual([cap - 1, 31]);
 });
 
 // auctionHistory had no coverage at all before this fix; this test both adds
@@ -139,15 +170,15 @@ test('bazaarHistory includes hourly points exactly at the 7d cap, excludes just 
 // boundary rigor as the bazaarHistory cases above.
 test('auctionHistory caps raw at 7d (daily unconditional): includes the boundary, excludes just past it', async () => {
 	await env.DB.batch([
-		env.DB
-			.prepare('INSERT INTO auction_points (item, tier, t, lowest, median, count) VALUES (?, 2, ?, ?, ?, ?)')
-			.bind('WHEAT', now - 100 * DAY, 100, 110, 3),
-		env.DB
-			.prepare('INSERT INTO auction_points (item, tier, t, lowest, median, count) VALUES (?, 0, ?, ?, ?, ?)')
-			.bind('WHEAT', now - 7 * DAY, 200, 210, 5),
-		env.DB
-			.prepare('INSERT INTO auction_points (item, tier, t, lowest, median, count) VALUES (?, 0, ?, ?, ?, ?)')
-			.bind('WHEAT', now - 7 * DAY - 1, 300, 310, 7)
+		env.DB.prepare(
+			'INSERT INTO auction_points (item, tier, t, lowest, median, count) VALUES (?, 2, ?, ?, ?, ?)'
+		).bind('WHEAT', now - 100 * DAY, 100, 110, 3),
+		env.DB.prepare(
+			'INSERT INTO auction_points (item, tier, t, lowest, median, count) VALUES (?, 0, ?, ?, ?, ?)'
+		).bind('WHEAT', now - 7 * DAY, 200, 210, 5),
+		env.DB.prepare(
+			'INSERT INTO auction_points (item, tier, t, lowest, median, count) VALUES (?, 0, ?, ?, ?, ?)'
+		).bind('WHEAT', now - 7 * DAY - 1, 300, 310, 7)
 	]);
 	const h = await auctionHistory(env.DB, 'WHEAT');
 	expect(h).toEqual([
@@ -163,8 +194,7 @@ test('auctionHistory caps raw at 7d (daily unconditional): includes the boundary
 // entirely - and confirm the cached (stale) value is still what's returned.
 test('getBazaarSnapshot serves the cached value across a direct table mutation within the TTL', async () => {
 	const before = await getBazaarSnapshot(env.DB); // warms/reuses the 'bazaar' cache entry
-	await env.DB
-		.prepare("UPDATE bazaar_snapshot SET body = ? WHERE item = 'WHEAT'")
+	await env.DB.prepare("UPDATE bazaar_snapshot SET body = ? WHERE item = 'WHEAT'")
 		.bind(JSON.stringify({ qs: { bp: 999, sp: 998, bmw: 1, smw: 1 } }))
 		.run();
 	const after = await getBazaarSnapshot(env.DB);
@@ -180,8 +210,7 @@ test('getBazaarSnapshot serves the cached value across a direct table mutation w
 // isolate), this test - not production code - is what should be revisited.
 test('getBazaarSnapshot refetches once the TTL expires', async () => {
 	await getBazaarSnapshot(env.DB); // warm the cache with the seeded (bp=10) value
-	await env.DB
-		.prepare("UPDATE bazaar_snapshot SET body = ? WHERE item = 'WHEAT'")
+	await env.DB.prepare("UPDATE bazaar_snapshot SET body = ? WHERE item = 'WHEAT'")
 		.bind(JSON.stringify({ qs: { bp: 777, sp: 776, bmw: 1, smw: 1 } }))
 		.run();
 	vi.useFakeTimers();
@@ -210,7 +239,10 @@ test('bazaarSparks: 12 seeked tier-0 samples per snapshot-listed product, shape 
 
 	// SPARK_FULL: tier-0 points every 4h across the full 7d window, strictly
 	// increasing buy, last point exactly at `now` (42 * 14400s = 604800s = 7d).
-	const fullValues = Array.from({ length: 42 }, (_, i) => i + 1);
+	// The last point's price is deliberately un-round: the 12th sample time is
+	// exactly `now`, so 1234567.89 there has to come back as 1235000 (4
+	// significant figures) rather than passing through unrounded.
+	const fullValues = Array.from({ length: 42 }, (_, i) => (i === 41 ? 1_234_567.89 : i + 1));
 	const fullRows = fullValues
 		.map((v, i) => `('SPARK_FULL', 0, ${since + (i + 1) * HOUR4}, ${v}, ${v - 1})`)
 		.join(', ');
@@ -254,11 +286,13 @@ test('bazaarSparks: 12 seeked tier-0 samples per snapshot-listed product, shape 
 
 	const sparks = await bazaarSparks(env.DB, now);
 
-	// 1. exactly 12 values, each rounded to 4 sig figs, last === newest buy (42),
-	// non-decreasing (seed buy is monotonically increasing with t).
+	// 1. exactly 12 values, each rounded to 4 sig figs, last === the newest buy
+	// rounded (1234567.89 -> 1235000), non-decreasing (seed buy is
+	// monotonically increasing with t).
 	const full = sparks.get('SPARK_FULL')!;
 	expect(full).toHaveLength(12);
-	expect(full[11]).toBe(42);
+	expect(full[11]).toBe(1_235_000);
+	expect(full[10]).toBe(38); // the 11th sample still seeks an un-rounded value
 	expect(full.every((v) => v === Number(v.toPrecision(4)))).toBe(true);
 	expect(full.every((v, i) => i === 0 || v >= full[i - 1])).toBe(true);
 
@@ -295,4 +329,40 @@ test('auctionSparks samples the median column (not lowest) for snapshot-listed a
 	expect(values).toEqual([200, 250]); // medians, in time order
 	expect(values).not.toContain(100); // lowest values must not leak in
 	expect(values).not.toContain(150);
+});
+
+// bazaarWindowChanges and bazaarSeriesSince are cached under minute-bucketed
+// keys, so the repeat renders a single page does inside the TTL cost one
+// query, not one per render. Those keys change over time, so every miss also
+// sweeps expired entries out of the Map (otherwise it would grow for the life
+// of the isolate). The sweep isn't observable from outside the module, so what
+// is asserted here is the visible half: a hit inside the TTL, a refetch past
+// it. Same direct-mutation trick as the getBazaarSnapshot pair above.
+const newRawPoint = () =>
+	env.DB.prepare('INSERT INTO bazaar_points (item, tier, t, buy, sell) VALUES (?, 0, ?, ?, ?)')
+		.bind('WHEAT', now - 100, 12, 11)
+		.run();
+
+test('bazaarWindowChanges serves the cached value across a direct table mutation within the TTL', async () => {
+	const since = now - DAY;
+	const before = await bazaarWindowChanges(env.DB, since);
+	expect(before).toEqual([{ id: 'WHEAT', first: 10, last: 11 }]);
+	await newRawPoint(); // a newer raw point would move `last` to 12 on a refetch
+	expect(await bazaarWindowChanges(env.DB, since)).toEqual([{ id: 'WHEAT', first: 10, last: 11 }]);
+});
+
+test('bazaarWindowChanges refetches once the TTL expires', async () => {
+	const since = now - DAY;
+	await bazaarWindowChanges(env.DB, since); // warm (or reuse) the minute-bucketed key
+	await newRawPoint();
+	vi.useFakeTimers();
+	try {
+		vi.setSystemTime(new Date());
+		vi.advanceTimersByTime(61_000); // past the 60s TTL
+		expect(await bazaarWindowChanges(env.DB, since)).toEqual([
+			{ id: 'WHEAT', first: 10, last: 12 }
+		]);
+	} finally {
+		vi.useRealTimers();
+	}
 });

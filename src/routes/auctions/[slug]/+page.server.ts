@@ -9,7 +9,7 @@ import {
 import { summarizeHistory } from '$lib/market/history-summary';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ params, platform }) => {
+export const load: PageServerLoad = async ({ params, platform, setHeaders }) => {
 	const db = requireDb(platform);
 	const id = await resolveAuctionId(db, params.slug);
 	if (!id) error(404, 'Unknown item');
@@ -18,7 +18,11 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 		auctionHistory(db, id),
 		auctionSummaryHistory(db, id)
 	]);
+	// the TTL cache can lapse between resolveAuctionId and this read, so an
+	// item delisted in between is gone from the snapshot by now
 	const stats = items[id];
+	if (!stats) error(404, 'Unknown item');
+	setHeaders({ 'cache-control': 'public, max-age=0, s-maxage=60' });
 	return {
 		slug: params.slug,
 		name: stats.name,

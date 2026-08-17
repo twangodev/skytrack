@@ -6,7 +6,11 @@
 	"compatibility_flags": ["nodejs_als"],
 	"assets": { "binding": "ASSETS", "directory": ".svelte-kit/cloudflare" },
 	"d1_databases": [
-		{ "binding": "DB", "database_name": "skytrack", "database_id": "7188bd2c-07c4-419b-9c37-ae7e186452f9" }
+		{
+			"binding": "DB",
+			"database_name": "skytrack",
+			"database_id": "7188bd2c-07c4-419b-9c37-ae7e186452f9"
+		}
 	],
 	"observability": { "enabled": true }
 }

@@ -3,8 +3,9 @@ import { slugFromId } from '$lib/slug';
 import { titleCase } from '$lib/format';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ platform }) => {
+export const load: PageServerLoad = async ({ platform, setHeaders }) => {
 	const db = requireDb(platform);
+	setHeaders({ 'cache-control': 'public, max-age=0, s-maxage=60' });
 	const now = Math.floor(Date.now() / 1000);
 	const [{ lastUpdated, products }, items, sparks] = await Promise.all([
 		getBazaarSnapshot(db),

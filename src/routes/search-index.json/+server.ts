@@ -1,24 +1,27 @@
 import { json } from '@sveltejs/kit';
-import { loadBazaar, loadAuctions, loadItems } from '$lib/server/data';
+import { requireDb, getBazaarSnapshot, getAuctionSnapshot, getItems } from '$lib/server/db';
 import { aliasesForItem } from '$lib/aliases';
 import { slugFromId } from '$lib/slug';
 import { titleCase } from '$lib/format';
 import type { RequestHandler } from './$types';
 
-export const prerender = true;
-
 // The full item directory is ~300KB of JSON; serving it as its own cacheable
 // asset keeps the landing page small and off the critical path.
-export const GET: RequestHandler = () => {
-	const items = loadItems();
+export const GET: RequestHandler = async ({ platform }) => {
+	const db = requireDb(platform);
+	const [bazaar, auctions, items] = await Promise.all([
+		getBazaarSnapshot(db),
+		getAuctionSnapshot(db),
+		getItems(db)
+	]);
 	const index = [
-		...Object.keys(loadBazaar().products).map((id) => ({
+		...Object.keys(bazaar.products).map((id) => ({
 			slug: slugFromId(id),
 			name: items[id]?.name ?? titleCase(id),
 			kind: 'bazaar' as const,
 			aliases: aliasesForItem(id)
 		})),
-		...Object.entries(loadAuctions().items).map(([id, stats]) => ({
+		...Object.entries(auctions.items).map(([id, stats]) => ({
 			slug: slugFromId(id),
 			name: stats.name,
 			kind: 'auctions' as const,

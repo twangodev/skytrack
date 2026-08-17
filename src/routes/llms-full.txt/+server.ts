@@ -1,15 +1,16 @@
-import { loadBazaar, loadAuctions, loadItems } from '$lib/server/data';
+import { requireDb, getBazaarSnapshot, getAuctionSnapshot, getItems } from '$lib/server/db';
 import { slugFromId } from '$lib/slug';
 import { titleCase, formatPrice } from '$lib/format';
 import { site } from '$lib/config';
 import type { RequestHandler } from './$types';
 
-export const prerender = true;
-
-export const GET: RequestHandler = () => {
-	const bazaar = loadBazaar();
-	const auctions = loadAuctions();
-	const items = loadItems();
+export const GET: RequestHandler = async ({ platform }) => {
+	const db = requireDb(platform);
+	const [bazaar, auctions, items] = await Promise.all([
+		getBazaarSnapshot(db),
+		getAuctionSnapshot(db),
+		getItems(db)
+	]);
 	const updated = new Date(bazaar.lastUpdated).toISOString();
 
 	const bazaarLines = Object.entries(bazaar.products)

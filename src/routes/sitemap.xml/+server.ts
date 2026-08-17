@@ -1,11 +1,12 @@
-import { loadBazaar, bazaarSlugMap, auctionSlugMap } from '$lib/server/data';
+import { requireDb, getBazaarSnapshot, getAuctionSnapshot } from '$lib/server/db';
+import { slugFromId } from '$lib/slug';
 import { site } from '$lib/config';
 import type { RequestHandler } from './$types';
 
-export const prerender = true;
-
-export const GET: RequestHandler = () => {
-	const lastmod = new Date(loadBazaar().lastUpdated).toISOString().slice(0, 10);
+export const GET: RequestHandler = async ({ platform }) => {
+	const db = requireDb(platform);
+	const [bazaar, auctions] = await Promise.all([getBazaarSnapshot(db), getAuctionSnapshot(db)]);
+	const lastmod = new Date(bazaar.lastUpdated).toISOString().slice(0, 10);
 	const urls = [
 		'/',
 		'/bazaar',
@@ -19,8 +20,12 @@ export const GET: RequestHandler = () => {
 		'/skyblock/auction-price-history',
 		'/skyblock/lowest-bin-history',
 		'/skyblock/item-flipping',
-		...[...bazaarSlugMap().keys()].map((slug) => `/bazaar/${slug}`),
-		...[...auctionSlugMap().keys()].map((slug) => `/auctions/${slug}`)
+		...Object.keys(bazaar.products)
+			.map(slugFromId)
+			.map((slug) => `/bazaar/${slug}`),
+		...Object.keys(auctions.items)
+			.map(slugFromId)
+			.map((slug) => `/auctions/${slug}`)
 	];
 
 	const body = `<?xml version="1.0" encoding="UTF-8"?>

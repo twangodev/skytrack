@@ -3,8 +3,17 @@
 // statements; db.batch() is atomic per chunk.
 import type { D1Database, D1PreparedStatement } from '@cloudflare/workers-types';
 import type { BazaarProductSnapshot, AuctionItemStats } from '../../../src/lib/market/aggregate';
-import { bucketMedian, bazaarMedian, auctionMedian, RAW_WINDOW, HOURLY_WINDOW, DAY, HOUR } from '../../../src/lib/market/bucket';
-import type { BazaarPoint, AuctionPoint } from '../../../src/lib/market/state';
+import {
+	bucketMedian,
+	bazaarMedian,
+	auctionMedian,
+	RAW_WINDOW,
+	HOURLY_WINDOW,
+	DAY,
+	HOUR,
+	type BazaarPoint,
+	type AuctionPoint
+} from '../../../src/lib/market/bucket';
 import { slugFromId } from '../../../src/lib/slug';
 import { titleCase } from '../../../src/lib/format';
 

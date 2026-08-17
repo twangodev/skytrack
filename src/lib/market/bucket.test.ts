@@ -7,9 +7,10 @@ import {
 	DAY,
 	HOUR,
 	RAW_WINDOW,
-	HOURLY_WINDOW
+	HOURLY_WINDOW,
+	type BazaarPoint,
+	type AuctionPoint
 } from './bucket';
-import type { BazaarPoint, AuctionPoint } from './state';
 
 describe('round1', () => {
 	test('rounds to one decimal place', () => {

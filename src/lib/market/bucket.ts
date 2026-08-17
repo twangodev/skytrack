@@ -1,5 +1,7 @@
 import { median } from './aggregate';
-import type { BazaarPoint, AuctionPoint } from './state';
+
+export type BazaarPoint = { t: number; b: number; s: number };
+export type AuctionPoint = { t: number; l: number; m: number; c: number };
 
 export const DAY = 86_400;
 export const HOUR = 3_600;

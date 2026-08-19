@@ -443,3 +443,45 @@ test('bazaarSeriesSince returns each item ascending by t, unaffected by interlea
 		{ t: since + 250, b: 4, s: 4 }
 	]);
 });
+
+// Read replication: requireDb() hands query functions a D1Database Session
+// (env.DB.withSession(...)) instead of the plain binding. Prove the read
+// layer actually works when called through that session object, not just
+// through env.DB directly - same seeds, same real values as the
+// direct-binding tests above (snapshot round-trip and bazaarHistory tier
+// capping), just routed through the session's prepare/batch.
+test('read layer works through a D1 session (read replication path)', async () => {
+	const session = env.DB.withSession('first-unconstrained');
+
+	// The earlier 'getBazaarSnapshot refetches once the TTL expires' test
+	// leaves the module-level 'bazaar' cache entry timestamped via an
+	// advanced fake clock (now + 61s), which sits ahead of real time - a
+	// same-size 61s jump here lands right back inside that entry's TTL
+	// window and would still read its stale (bp=777) value instead of a
+	// fresh compute. Jump forward by an hour, comfortably past that, so this
+	// assertion exercises the session actually querying the DB (with the
+	// current, beforeEach-seeded bp=10 row) rather than any leftover cache.
+	vi.useFakeTimers();
+	try {
+		vi.setSystemTime(new Date());
+		vi.advanceTimersByTime(60 * 60 * 1000);
+		const snap = await getBazaarSnapshot(session);
+		expect(snap.lastUpdated).toBe(now * 1000);
+		expect(snap.products.WHEAT.qs.bp).toBe(10);
+	} finally {
+		vi.useRealTimers();
+	}
+
+	// bazaarHistory isn't cached, but it derives its 24h raw-tier window from
+	// Date.now() at call time, so it must run under the real clock - the
+	// seeded raw points are only real-time-recent, not fake-clock-recent.
+	const h = await bazaarHistory(session, 'WHEAT');
+	expect(h).toEqual([
+		{ t: now - 101 * DAY, b: 6.2, s: 5.2 },
+		{ t: now - 100 * DAY, b: 5, s: 4 },
+		{ t: now - 99 * DAY, b: 6.5, s: 5.5 },
+		{ t: now - 95 * DAY, b: 7, s: 6 },
+		{ t: now - 600, b: 10, s: 9 },
+		{ t: now - 300, b: 11, s: 10 }
+	]);
+});

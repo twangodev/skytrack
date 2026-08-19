@@ -45,9 +45,21 @@ export interface ExampleItem {
 const DAY = 86_400;
 const TTL_MS = 60_000;
 
-export function requireDb(platform: App.Platform | undefined): D1Database {
+// Both D1Database and D1DatabaseSession expose prepare/batch with identical
+// signatures - this is the minimal structural type every query function in
+// this file needs, so either satisfies it without an explicit cast.
+export type Db = Pick<D1Database, 'prepare' | 'batch'>;
+
+export function requireDb(platform: App.Platform | undefined): Db {
 	if (!platform?.env.DB) error(500, 'database unavailable');
-	return platform.env.DB;
+	// Read replication: route this request's reads to the nearest replica.
+	// 'first-unconstrained' because the HTTP path never writes and the site
+	// tolerates minutes of staleness by design (60s cache, 5-min cadence);
+	// sequential consistency within the session is still guaranteed. No
+	// bookmark propagation across requests - there are no user writes to
+	// read-your-own. Writes (the scheduled handler) keep the plain binding
+	// and always hit the primary.
+	return platform.env.DB.withSession('first-unconstrained');
 }
 
 const cache = new Map<string, { at: number; value: unknown }>();
@@ -73,7 +85,7 @@ interface ItemsIndex {
 	idToSlug: Map<string, string>;
 }
 
-async function itemsIndex(db: D1Database): Promise<ItemsIndex> {
+async function itemsIndex(db: Db): Promise<ItemsIndex> {
 	return cached('items', async () => {
 		const { results } = await db
 			.prepare('SELECT id, slug, name, tier, category, npc FROM items')
@@ -102,13 +114,13 @@ async function itemsIndex(db: D1Database): Promise<ItemsIndex> {
 	});
 }
 
-export const getItems = async (db: D1Database): Promise<Record<string, ItemMeta>> =>
+export const getItems = async (db: Db): Promise<Record<string, ItemMeta>> =>
 	(await itemsIndex(db)).byId;
 
-export const getItemIdBySlug = async (db: D1Database, slug: string): Promise<string | undefined> =>
+export const getItemIdBySlug = async (db: Db, slug: string): Promise<string | undefined> =>
 	(await itemsIndex(db)).slugToId.get(slug);
 
-async function metaMs(db: D1Database, key: string): Promise<number> {
+async function metaMs(db: Db, key: string): Promise<number> {
 	const row = await db
 		.prepare('SELECT value FROM meta WHERE key = ?')
 		.bind(key)
@@ -116,7 +128,7 @@ async function metaMs(db: D1Database, key: string): Promise<number> {
 	return row ? Number(row.value) : 0;
 }
 
-export async function getBazaarSnapshot(db: D1Database): Promise<BazaarFile> {
+export async function getBazaarSnapshot(db: Db): Promise<BazaarFile> {
 	return cached('bazaar', async () => {
 		const [{ results }, lastUpdated] = await Promise.all([
 			db.prepare('SELECT item, body FROM bazaar_snapshot').all<{ item: string; body: string }>(),
@@ -128,7 +140,7 @@ export async function getBazaarSnapshot(db: D1Database): Promise<BazaarFile> {
 	});
 }
 
-export async function getAuctionSnapshot(db: D1Database): Promise<AuctionsFile> {
+export async function getAuctionSnapshot(db: Db): Promise<AuctionsFile> {
 	return cached('auctions', async () => {
 		const [{ results }, lastUpdated] = await Promise.all([
 			db.prepare('SELECT item, body FROM auction_snapshot').all<{ item: string; body: string }>(),
@@ -143,13 +155,13 @@ export async function getAuctionSnapshot(db: D1Database): Promise<AuctionsFile> 
 // Kind-scoped resolution: today's slug maps were built from the current
 // snapshot's keys, so a slug only resolves on /bazaar/* while the product is
 // actually listed (and likewise for auctions). Preserve that.
-export async function resolveBazaarId(db: D1Database, slug: string): Promise<string | undefined> {
+export async function resolveBazaarId(db: Db, slug: string): Promise<string | undefined> {
 	const id = await getItemIdBySlug(db, slug);
 	if (!id) return undefined;
 	return (await getBazaarSnapshot(db)).products[id] ? id : undefined;
 }
 
-export async function resolveAuctionId(db: D1Database, slug: string): Promise<string | undefined> {
+export async function resolveAuctionId(db: Db, slug: string): Promise<string | undefined> {
 	const id = await getItemIdBySlug(db, slug);
 	if (!id) return undefined;
 	return (await getAuctionSnapshot(db)).items[id] ? id : undefined;
@@ -163,7 +175,7 @@ export async function resolveAuctionId(db: D1Database, slug: string): Promise<st
 //                     window, so the newest hourly row is ~90d old and an
 //                     absolute `t >= now - 7d` cutoff could never match one.
 //   tier 0 (raw)    - the trailing 24 hours, absolute.
-export async function bazaarHistory(db: D1Database, id: string): Promise<BazaarHistoryPoint[]> {
+export async function bazaarHistory(db: Db, id: string): Promise<BazaarHistoryPoint[]> {
 	const now = Math.floor(Date.now() / 1000);
 	const { results } = await db
 		.prepare(
@@ -179,10 +191,7 @@ export async function bazaarHistory(db: D1Database, id: string): Promise<BazaarH
 	return results;
 }
 
-export async function bazaarSummaryHistory(
-	db: D1Database,
-	id: string
-): Promise<BazaarHistoryPoint[]> {
+export async function bazaarSummaryHistory(db: Db, id: string): Promise<BazaarHistoryPoint[]> {
 	const { results } = await db
 		.prepare('SELECT t, buy AS b, sell AS s FROM bazaar_points WHERE item = ?')
 		.bind(id)
@@ -190,7 +199,7 @@ export async function bazaarSummaryHistory(
 	return results;
 }
 
-export async function auctionHistory(db: D1Database, id: string): Promise<AuctionHistoryPoint[]> {
+export async function auctionHistory(db: Db, id: string): Promise<AuctionHistoryPoint[]> {
 	const now = Math.floor(Date.now() / 1000);
 	const { results } = await db
 		.prepare(
@@ -203,10 +212,7 @@ export async function auctionHistory(db: D1Database, id: string): Promise<Auctio
 	return results;
 }
 
-export async function auctionSummaryHistory(
-	db: D1Database,
-	id: string
-): Promise<AuctionHistoryPoint[]> {
+export async function auctionSummaryHistory(db: Db, id: string): Promise<AuctionHistoryPoint[]> {
 	const { results } = await db
 		.prepare('SELECT t, lowest AS l, median AS m, count AS c FROM auction_points WHERE item = ?')
 		.bind(id)
@@ -221,7 +227,7 @@ export async function auctionSummaryHistory(
 // callers derive `since` from Date.now(), which would otherwise miss every
 // time.
 export function bazaarWindowChanges(
-	db: D1Database,
+	db: Db,
 	since: number
 ): Promise<{ id: string; first: number; last: number }[]> {
 	return cached(`windowChanges:${since - (since % 60)}`, async () => {
@@ -259,7 +265,7 @@ export const bazaarSeriesSinceSql = (placeholders: string): string =>
 // ORDER BY item, t instead keeps the planner on the (item, tier, t) primary
 // key, doing a bounded seek per item.
 export function bazaarSeriesSince(
-	db: D1Database,
+	db: Db,
 	ids: string[],
 	since: number
 ): Promise<Map<string, BazaarHistoryPoint[]>> {
@@ -282,7 +288,7 @@ export function bazaarSeriesSince(
 	});
 }
 
-export async function itemSeriesJson(db: D1Database, id: string): Promise<ItemSeriesJson> {
+export async function itemSeriesJson(db: Db, id: string): Promise<ItemSeriesJson> {
 	const now = Math.floor(Date.now() / 1000);
 	const [bRaw, bHourly, bDaily, aRaw, aDaily] = await db.batch([
 		db
@@ -338,7 +344,7 @@ const WEEK = 7 * DAY;
 const SPARK_SAMPLES = 12;
 
 async function sparkSamples(
-	db: D1Database,
+	db: Db,
 	snapshotTable: 'bazaar_snapshot' | 'auction_snapshot',
 	pointsTable: 'bazaar_points' | 'auction_points',
 	column: 'buy' | 'median',
@@ -370,15 +376,15 @@ async function sparkSamples(
 }
 
 /** Trailing-7d sparkline values for every currently-listed bazaar product: 12 evenly spaced samples ending at `now`, each the latest raw (tier 0) `buy` in [now-7d, t_k]. One PK seek per sample; ~12 index rows per product. Fewer than 2 samples -> []. Values rounded to 4 significant figures (matches the old file-based spark helper). Cached under the 60s TTL (key ignores `now`). */
-export const bazaarSparks = (db: D1Database, now: number) =>
+export const bazaarSparks = (db: Db, now: number) =>
 	cached('bazaarSparks', () => sparkSamples(db, 'bazaar_snapshot', 'bazaar_points', 'buy', now));
 /** Same for currently-listed auction items, sampling `median` from auction_points tier 0. */
-export const auctionSparks = (db: D1Database, now: number) =>
+export const auctionSparks = (db: Db, now: number) =>
 	cached('auctionSparks', () =>
 		sparkSamples(db, 'auction_snapshot', 'auction_points', 'median', now)
 	);
 
-export async function popularAuctionItems(db: D1Database, limit: number): Promise<ExampleItem[]> {
+export async function popularAuctionItems(db: Db, limit: number): Promise<ExampleItem[]> {
 	const [{ items }, index] = await Promise.all([getAuctionSnapshot(db), itemsIndex(db)]);
 	return Object.entries(items)
 		.sort(([, a], [, b]) => b.count - a.count)
@@ -386,7 +392,7 @@ export async function popularAuctionItems(db: D1Database, limit: number): Promis
 		.map(([id, stats]) => ({ slug: index.idToSlug.get(id) ?? id.toLowerCase(), name: stats.name }));
 }
 
-export async function popularBazaarItems(db: D1Database, limit: number): Promise<ExampleItem[]> {
+export async function popularBazaarItems(db: Db, limit: number): Promise<ExampleItem[]> {
 	const [{ products }, index] = await Promise.all([getBazaarSnapshot(db), itemsIndex(db)]);
 	return Object.entries(products)
 		.sort(([, a], [, b]) => b.qs.bmw + b.qs.smw - (a.qs.bmw + a.qs.smw))

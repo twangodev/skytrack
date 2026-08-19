@@ -6,7 +6,7 @@
 // time only (see root wrangler.jsonc's top comment).
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "skytrack-site",
+	"name": "skytrack",
 	"main": ".svelte-kit/cloudflare/_worker.js",
 	"compatibility_date": "2026-08-01",
 	"compatibility_flags": ["nodejs_als"],

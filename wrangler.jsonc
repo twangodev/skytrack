@@ -8,7 +8,7 @@
 // workers/pipeline/src/crons.test.ts for a config-drift guard between the two.
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "skytrack-site",
+	"name": "skytrack",
 	"main": "worker/index.ts",
 	"compatibility_date": "2026-08-01",
 	"compatibility_flags": ["nodejs_compat"],

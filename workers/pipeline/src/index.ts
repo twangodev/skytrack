@@ -1,10 +1,3 @@
-// Data pipeline: the port of scripts/fetch-data.ts orchestration.
-// Three crons, dispatched on controller.cron (see crons.ts):
-//   */5 * * * *   bazaar refresh (light JSON)
-//   10 */3 * * *  official items + full auction crawl (NBT-heavy)
-//   30 4 * * *    rollup + snapshot pruning
-// wrangler.jsonc's limits.cpu_ms is 300 000 (5 min) for every invocation - the
-// crawl must fit that; sub-hourly crons would otherwise default to 30 s.
 import type { ZodType } from 'zod';
 import {
 	bazaarResponse,
@@ -76,13 +69,6 @@ async function refreshAuctions(env: Env): Promise<void> {
 	}
 
 	const first = await fetchJson(`${AUCTIONS_URL}?page=0`, auctionsPage);
-	// Dedupe into the map as each concurrency chunk resolves rather than
-	// retaining every parsed page: the crawl is tens of thousands of listings
-	// spread over ~1k-listing pages, and keeping the page objects alive
-	// alongside the deduped set holds a second copy of all of them for no
-	// benefit. Behaviour is unchanged - later pages still win a uuid collision
-	// (as in the old `new Map(pages.flatMap(...))`) and first-insertion order
-	// is preserved.
 	const byUuid = new Map<string, RawAuction>();
 	const collect = (page: { auctions: RawAuction[] }) => {
 		for (const a of page.auctions) byUuid.set(a.uuid, a);
@@ -147,7 +133,6 @@ export const handleScheduled = async (
 	_ctx?: ExecutionContext
 ): Promise<void> => {
 	if (env.BOOTSTRAP !== '1') await assertPopulated(env.DB);
-	// a thrown error marks the invocation failed in the CF dashboard
 	switch (controller.cron) {
 		case CRONS.bazaar:
 			return refreshBazaar(env);

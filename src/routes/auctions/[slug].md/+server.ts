@@ -14,8 +14,6 @@ export const GET: RequestHandler = async ({ params, platform }) => {
 		getAuctionSnapshot(db),
 		auctionHistory(db, id)
 	]);
-	// the TTL cache can lapse between resolveAuctionId and this read, so an
-	// item delisted in between is gone from the snapshot by now
 	const stats = items[id];
 	if (!stats) error(404, 'Unknown item');
 

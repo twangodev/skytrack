@@ -1,6 +1,3 @@
-// Replaces the ~4k pre-emitted static/data/items/*.json files. Same public
-// URL and body shape; resolves any id ever tracked (incl. delisted items),
-// like the old union-of-state-keys emit did.
 import { error, json } from '@sveltejs/kit';
 import { requireDb, getItemIdBySlug, itemSeriesJson } from '$lib/server/db';
 import type { RequestHandler } from './$types';

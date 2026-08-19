@@ -1,7 +1,6 @@
 <script lang="ts" module>
 	import type { ItemSeriesJson } from '$lib/market/series';
 
-	// full-history endpoint, fetched once per item and shared across navigations
 	const seriesCache = new Map<string, Promise<ItemSeriesJson | null>>();
 	function loadSeries(slug: string): Promise<ItemSeriesJson | null> {
 		let pending = seriesCache.get(slug);
@@ -10,7 +9,6 @@
 				.then((res) => (res.ok ? (res.json() as Promise<ItemSeriesJson>) : null))
 				.catch(() => null)
 				.then((json) => {
-					// don't memoize failures - allow a retry on the next add
 					if (json === null) seriesCache.delete(slug);
 					return json;
 				});
@@ -46,13 +44,10 @@
 
 	const itemKey = (item: Picked) => `${item.kind}:${item.slug}`;
 
-	// --- picker (inline ItemSearch pattern) ---
-
 	let query = $state('');
 	let selected = $state(0);
 	let focused = $state(false);
 
-	// The index is ~300KB; fetch it once the user shows intent to search.
 	let items = $state<SearchItem[]>([]);
 	let indexPromise: Promise<SearchItem[]> | null = null;
 	function ensureIndex(): Promise<SearchItem[]> {
@@ -69,7 +64,7 @@
 					return mapped;
 				})
 				.catch(() => {
-					indexPromise = null; // allow a retry on next focus
+					indexPromise = null;
 					return [];
 				});
 		}
@@ -120,8 +115,6 @@
 		}
 	}
 
-	// --- selection + URL sync ---
-
 	let picked = $state<Picked[]>([]);
 	const atMax = $derived(picked.length >= MAX_ITEMS);
 
@@ -131,7 +124,6 @@
 		const param = picked.map((p) => `${p.slug}:${p.kind}`).join(',');
 		if (param) url.searchParams.set('items', param);
 		else url.searchParams.delete('items');
-		// SvelteKit's replaceState keeps the router's bookkeeping intact
 		replaceState(url, {});
 	}
 
@@ -147,7 +139,6 @@
 		syncUrl();
 	}
 
-	// restore selection from ?items=slug:kind,slug:kind (searchParams are unavailable while prerendering)
 	$effect(() => {
 		if (!browser) return;
 		const raw = new URLSearchParams(location.search).get('items');
@@ -159,15 +150,13 @@
 			.slice(0, MAX_ITEMS);
 		if (wanted.length === 0) return;
 		void ensureIndex().then((all) => {
-			if (picked.length > 0) return; // user beat the index load
+			if (picked.length > 0) return;
 			picked = wanted
 				.map(([slug, kind]) => all.find((i) => i.slug === slug && i.kind === kind))
 				.filter((i): i is SearchItem => i !== undefined)
 				.map(({ slug, name, kind }) => ({ slug, name, kind }));
 		});
 	});
-
-	// --- per-item history ---
 
 	type MergedPoint = [number, number, number];
 	let loaded = $state<Record<string, MergedPoint[]>>({});
@@ -186,8 +175,6 @@
 		}
 	});
 
-	// --- ranges (PriceOverview pattern) ---
-
 	const RANGES = [
 		{ key: '1D', label: '1D', seconds: 86_400 },
 		{ key: '1W', label: '1W', seconds: 7 * 86_400 },
@@ -198,13 +185,11 @@
 	type RangeKey = (typeof RANGES)[number]['key'];
 	let range = $state<RangeKey>('ALL');
 
-	// --- normalization: overlap window → range clip → % change from window start ---
-
 	interface NormalizedSeries {
 		key: string;
 		item: Picked;
 		colorIndex: number;
-		points: [number, number][]; // [unix seconds, pct]
+		points: [number, number][];
 	}
 
 	const series = $derived.by((): NormalizedSeries[] => {
@@ -218,7 +203,6 @@
 			.filter((s) => s.raw !== undefined && s.raw.length >= 2);
 		if (present.length === 0) return [];
 
-		// overlapping window: max of firsts .. min of lasts; if invalid fall back to the union
 		const firsts = present.map((s) => s.raw[0][0]);
 		const lasts = present.map((s) => s.raw[s.raw.length - 1][0]);
 		let lo = Math.max(...firsts);
@@ -234,7 +218,7 @@
 		const out: NormalizedSeries[] = [];
 		for (const { item, colorIndex, key, raw } of present) {
 			const clipped = raw.filter(([t]) => t >= cutoff && t <= hi);
-			if (clipped.length < 2) continue; // gracefully exclude thin series
+			if (clipped.length < 2) continue;
 			const first = clipped[0][1];
 			if (first <= 0) continue;
 			out.push({

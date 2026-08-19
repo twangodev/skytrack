@@ -5,8 +5,6 @@ import { slugFromId } from '$lib/slug';
 import { titleCase } from '$lib/format';
 import type { RequestHandler } from './$types';
 
-// The full item directory is ~300KB of JSON; serving it as its own cacheable
-// asset keeps the landing page small and off the critical path.
 export const GET: RequestHandler = async ({ platform }) => {
 	const db = requireDb(platform);
 	const [bazaar, auctions, items] = await Promise.all([

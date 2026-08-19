@@ -3,8 +3,6 @@
 	import { page } from '$app/state';
 	import { slugFromId } from '$lib/slug';
 
-	// Shim for the pre-rewrite URL scheme: /advanced?product=ENCHANTED_DIAMOND.
-	// Those URLs are indexed and pinned all over; forward them to the new pages.
 	const target = $derived.by(() => {
 		if (!browser) return null;
 		const product = page.url.searchParams.get('product');

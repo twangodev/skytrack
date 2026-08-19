@@ -12,12 +12,10 @@
 		lower: string;
 	}
 
-	// searchParams are unavailable while prerendering
 	let query = $state(browser ? (page.url.searchParams.get('q') ?? '') : '');
 	let selected = $state(0);
 	let focused = $state(false);
 
-	// The index is ~300KB; fetch it once the user shows intent to search.
 	let items = $state<SearchItem[]>([]);
 	let loadStarted = false;
 	async function ensureIndex() {
@@ -31,7 +29,7 @@
 				lower: [item.name, ...(item.aliases ?? [])].join(' ').toLowerCase()
 			}));
 		} catch {
-			loadStarted = false; // allow a retry on next focus
+			loadStarted = false;
 		}
 	}
 

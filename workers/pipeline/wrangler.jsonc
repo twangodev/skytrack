@@ -1,5 +1,3 @@
-// Local dev + tests only - production runs everything on skytrack-site
-// (root wrangler.jsonc). Used by `bun run db:seed:local` and the vitest pool.
 {
 	"$schema": "../../node_modules/wrangler/config-schema.json",
 	"name": "skytrack-pipeline",

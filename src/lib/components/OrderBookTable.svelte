@@ -9,7 +9,6 @@
 
 	const { levels, side }: Props = $props();
 
-	// buy_summary = instabuy offers (asks), sell_summary = instasell bids
 	const title = $derived(side === 'buy' ? 'Buy Orders (Asks)' : 'Sell Orders (Bids)');
 	const tone = $derived(side === 'buy' ? 'text-down' : 'text-up');
 </script>

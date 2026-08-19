@@ -56,9 +56,9 @@ describe('pickBucket', () => {
 	});
 
 	test('picks the smallest nice bucket that meets the target', () => {
-		expect(pickBucket(86_400)).toBe(1800); // 1D → 30m (~48 candles), not 1h (~24)
-		expect(pickBucket(7 * 86_400)).toBe(14_400); // 1W → 4h (~42 candles)
-		expect(pickBucket(30 * 86_400)).toBe(86_400); // 1M → 1d (~30 candles)
+		expect(pickBucket(86_400)).toBe(1800);
+		expect(pickBucket(7 * 86_400)).toBe(14_400);
+		expect(pickBucket(30 * 86_400)).toBe(86_400);
 	});
 
 	test('never buckets below the 5m source cadence', () => {
@@ -71,6 +71,6 @@ describe('pickBucket', () => {
 	});
 
 	test('honors a custom target count', () => {
-		expect(pickBucket(86_400, 24)).toBe(3600); // target 24 → 1D lands on 1h
+		expect(pickBucket(86_400, 24)).toBe(3600);
 	});
 });

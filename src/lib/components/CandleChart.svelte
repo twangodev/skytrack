@@ -3,9 +3,7 @@
 
 	interface Props {
 		candles: Candle[];
-		/** bucket width in seconds - drives candle body width on the time axis */
 		bucketSeconds: number;
-		/** fixed [start, end] unix-seconds window; defaults to the candle extent */
 		window?: [number, number];
 	}
 
@@ -14,9 +12,6 @@
 	const W = 600;
 	const PLOT_H = 200;
 
-	// x: time-scaled so gaps in the data render as gaps; each candle occupies
-	// its bucket [t, t + bucketSeconds). A fixed window keeps the axis a
-	// continuous rolling period instead of stretching the data extent.
 	const xStart = $derived(window?.[0] ?? candles[0]?.t ?? 0);
 	const span = $derived.by(() => {
 		if (window) return Math.max(1, window[1] - window[0]);
@@ -26,7 +21,6 @@
 	const x = $derived((t: number) => ((t - xStart) / span) * W);
 	const bodyW = $derived(Math.min(18, Math.max(1, (bucketSeconds / span) * W * 0.65)));
 
-	// y domain: [min low, max high] padded 4%
 	const domain = $derived.by((): [number, number] => {
 		let lo = Infinity;
 		let hi = -Infinity;
@@ -58,8 +52,6 @@
 
 {#if candles.length >= 2}
 	<div class="flex h-full w-full flex-col">
-		<!-- stretch fills the container; wicks keep their width via
-		     non-scaling-stroke, and text lives outside the svg -->
 		<svg
 			viewBox="0 0 {W} {PLOT_H}"
 			preserveAspectRatio="none"

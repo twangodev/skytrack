@@ -1,7 +1,3 @@
-// One-off rasterization of the favicon mark into PNG/ICO assets.
-// Rasterizers ignore the media query in static/favicon.svg, so inline a
-// dark-background variant here. Keep the glyph in sync with
-// src/lib/components/Logo.svelte and static/favicon.svg.
 import sharp from 'sharp';
 import pngToIco from 'png-to-ico';
 import { writeFile } from 'node:fs/promises';
@@ -26,7 +22,6 @@ const render = (svg: string, size: number) =>
 await writeFile('static/apple-touch-icon.png', await render(mark(0.82), 180));
 await writeFile('static/icon-192.png', await render(mark(0.82, 6), 192));
 await writeFile('static/icon-512.png', await render(mark(0.82, 6), 512));
-// maskable: mark shrunk into the safe zone on a full-bleed background
 await writeFile('static/icon-maskable.png', await render(mark(0.62), 512));
 await writeFile('static/favicon.ico', await pngToIco(await render(mark(0.82, 6), 32)));
 

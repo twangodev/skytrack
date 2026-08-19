@@ -12,7 +12,6 @@
 
 	const pct = (change: number) => `${change > 0 ? '+' : ''}${(change * 100).toFixed(1)}%`;
 
-	// Equal-weight market index: last point is today's change (series starts at 0).
 	const indexChange = $derived(
 		data.index.length >= 2 ? data.index[data.index.length - 1][1] : null
 	);

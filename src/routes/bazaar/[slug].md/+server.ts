@@ -26,14 +26,11 @@ export const GET: RequestHandler = async ({ params, platform }) => {
 		bazaarSeriesSince(db, [id], now - 2 * DAY),
 		bazaarHistory(db, id)
 	]);
-	// the TTL cache can lapse between resolveBazaarId and this read, so a
-	// product delisted in between is gone from the snapshot by now
 	const snap = products[id];
 	if (!snap) error(404, 'Unknown product');
 	const meta = items[id];
 	const name = meta?.name ?? titleCase(id);
 
-	// last 24h at hourly sampling keeps the table readable
 	const raw = rawSeries.get(id) ?? [];
 	const newest = raw[raw.length - 1]?.t ?? 0;
 	const recent = raw

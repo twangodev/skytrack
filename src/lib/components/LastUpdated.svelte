@@ -8,7 +8,6 @@
 
 	const { at, live = false }: Props = $props();
 
-	// re-render the relative label periodically
 	let now = $state(Date.now());
 	$effect(() => {
 		const timer = setInterval(() => (now = Date.now()), 30_000);
@@ -16,7 +15,7 @@
 	});
 
 	const label = $derived.by(() => {
-		void now; // re-derive when the clock ticks
+		void now;
 		return formatRelativeTime(at);
 	});
 </script>

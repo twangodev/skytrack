@@ -13,8 +13,6 @@ import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ platform, setHeaders }) => {
 	const db = requireDb(platform);
-	// edge TTL; only honoured once a zone Cache Rule caches Worker responses
-	// (Task 12)
 	setHeaders({ 'cache-control': 'public, max-age=0, s-maxage=60' });
 	const [bazaar, auctions, items] = await Promise.all([
 		getBazaarSnapshot(db),
@@ -22,14 +20,9 @@ export const load: PageServerLoad = async ({ platform, setHeaders }) => {
 		getItems(db)
 	]);
 
-	// Top movers: biggest |%Δ| in instabuy over a rolling 24h, liquid items only.
-	// Rolling rather than calendar-day: a UTC-midnight anchor leaves the whole
-	// dashboard empty for builds in the first minutes of each day.
 	const windowStart = Math.floor(Date.now() / 1000) - 86_400;
 	const changes = await bazaarWindowChanges(db, windowStart);
 
-	// Movers + breadth share the same ranked rows, computed once from the
-	// window-change query (cheap PK seeks) instead of per-product history.
 	let up = 0;
 	let down = 0;
 	const ranked = changes
@@ -65,7 +58,6 @@ export const load: PageServerLoad = async ({ platform, setHeaders }) => {
 		spark: (sparks.get(m.id) ?? []).map((h) => [h.t, h.b] as [number, number])
 	}));
 
-	// Market dashboard stats: total weekly volume, equal-weight index.
 	let totalWeeklyVolume = 0;
 	const liquid: { id: string; bmw: number }[] = [];
 	for (const [id, snap] of Object.entries(bazaar.products)) {
@@ -74,8 +66,6 @@ export const load: PageServerLoad = async ({ platform, setHeaders }) => {
 		liquid.push({ id, bmw: snap.qs.bmw });
 	}
 
-	// Equal-weight index: the window's points of the 50 most liquid products, each
-	// normalized to its first point, averaged per timestamp bucket.
 	const indexIds = liquid
 		.sort((a, b) => b.bmw - a.bmw)
 		.slice(0, 50)
@@ -101,7 +91,6 @@ export const load: PageServerLoad = async ({ platform, setHeaders }) => {
 		)
 		.sort((a, b) => a[0] - b[0]);
 
-	// Top flips: best buy-order to sell-offer opportunities by weekly potential.
 	const flips = Object.entries(bazaar.products)
 		.map(([id, snap]) => {
 			const { bp, sp, bmw, smw } = snap.qs;

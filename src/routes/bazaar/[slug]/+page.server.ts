@@ -21,8 +21,6 @@ export const load: PageServerLoad = async ({ params, platform, setHeaders }) => 
 		bazaarHistory(db, id),
 		bazaarSummaryHistory(db, id)
 	]);
-	// the TTL cache can lapse between resolveBazaarId and this read, so a
-	// product delisted in between is gone from the snapshot by now
 	const snapshot = products[id];
 	if (!snapshot) error(404, 'Unknown product');
 	setHeaders({ 'cache-control': 'public, max-age=0, s-maxage=60' });

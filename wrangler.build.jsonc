@@ -1,9 +1,3 @@
-// Adapter-facing config only: @sveltejs/adapter-cloudflare emits its worker
-// to this file's `main`. Production deploys use the root wrangler.jsonc,
-// whose `main` wraps the emitted worker with the scheduled handler.
-// compatibility_flags here intentionally stays "nodejs_als" and diverges from
-// root's "nodejs_compat" - the adapter never reads this field, so it's build
-// time only (see root wrangler.jsonc's top comment).
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "skytrack",

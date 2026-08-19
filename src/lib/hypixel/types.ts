@@ -30,10 +30,6 @@ export const bazaarResponse = z.object({
 	products: z.record(z.string(), bazaarProduct)
 });
 
-// z.object, not a passthrough schema: zod strips undeclared keys on parse, so
-// a full auction crawl retains only the seven fields below per listing instead
-// of the whole Hypixel payload (item_lore, bids, auctioneer, ...) for every one
-// of the tens of thousands of listings held in memory at once.
 export const rawAuction = z.object({
 	uuid: z.string(),
 	item_name: z.string(),

@@ -66,7 +66,6 @@ export function summarizeHistory(points: HistoryValuePoint[]): HistorySummary | 
 		lastTracked: clean[clean.length - 1].t,
 		low,
 		high,
-		// windowSummary already returns null when the series can't span the window.
 		day: windowSummary(clean, DAY),
 		week: windowSummary(clean, WEEK)
 	};

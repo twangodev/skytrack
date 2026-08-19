@@ -26,7 +26,7 @@ describe('bucketMedian', () => {
 		const points = [
 			{ t: base + 60 },
 			{ t: base + 120 },
-			{ t: base + HOUR + 60 } // falls into the next hour bucket
+			{ t: base + HOUR + 60 }
 		];
 		const result = bucketMedian(points, HOUR, (bucket, start) => ({
 			t: start,

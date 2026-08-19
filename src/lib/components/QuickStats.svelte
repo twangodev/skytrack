@@ -24,7 +24,6 @@
 
 	type Key = (typeof FIELDS)[number]['key'];
 
-	// flash green/red when a live poll moves a value, like the original site
 	let flashes = $state<Partial<Record<Key, 'up' | 'down'>>>({});
 	let previous: BazaarProductSnapshot['qs'] | null = null;
 	let timer: ReturnType<typeof setTimeout> | null = null;
@@ -43,8 +42,6 @@
 			if (timer) clearTimeout(timer);
 			timer = setTimeout(() => (flashes = {}), 1200);
 		}
-		// no cleanup here: a re-run with no changes must not kill the pending
-		// reset, or the flash colors stick until the next price move
 	});
 
 	$effect(() => {

@@ -6,7 +6,6 @@ const UNITS: [number, string][] = [
 ];
 
 function compactValue(value: number): number {
-	// ~3 significant figures: 1.23K, 12.3B, 123M
 	if (value < 10) return Math.round(value * 100) / 100;
 	if (value < 100) return Math.round(value * 10) / 10;
 	return Math.round(value);
@@ -14,8 +13,6 @@ function compactValue(value: number): number {
 
 export function formatCompact(n: number): string {
 	for (const [div, suffix] of UNITS) {
-		// 0.9995 threshold: values that would round up into the unit (999,999 -> 1M)
-		// take it, while 999 stays plain.
 		if (n >= div * 0.9995) return `${compactValue(n / div)}${suffix}`;
 	}
 	return `${Math.round(n)}`;

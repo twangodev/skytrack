@@ -5,7 +5,6 @@
 		title?: string;
 		description?: string;
 		canonical?: `/${string}` | '/';
-		/** markdown alternate of this page */
 		markdown?: `/${string}`;
 		jsonLd?: object | object[];
 	}

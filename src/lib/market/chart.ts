@@ -11,7 +11,6 @@ export function cumulative(levels: Level[]): Point[] {
 	});
 }
 
-/** Price domain covering both books with a little headroom. */
 export function depthDomain(buy: Level[], sell: Level[]): Domain {
 	const prices = [...buy, ...sell].map(([ppu]) => ppu);
 	if (prices.length === 0) return [0, 1];

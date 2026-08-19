@@ -6,9 +6,7 @@ export type AuctionPoint = { t: number; l: number; m: number; c: number };
 export const DAY = 86_400;
 export const HOUR = 3_600;
 
-/** raw points kept this long, then rolled to the next tier */
 export const RAW_WINDOW = 90 * DAY;
-/** hourly points kept this long, then rolled to daily */
 export const HOURLY_WINDOW = 730 * DAY;
 
 export function bucketMedian<P extends { t: number }>(

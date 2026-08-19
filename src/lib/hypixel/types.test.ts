@@ -35,11 +35,6 @@ describe('bazaarResponse', () => {
 	});
 });
 
-// The auction schemas are strict z.object (not passthrough) on purpose: a full
-// crawl parses tens of thousands of listings, and Hypixel sends a large
-// `item_lore`/`bids`/`auctioneer` payload with each one. Stripping the
-// undeclared keys at parse time is what keeps the retained crawl set small
-// enough for the isolate.
 describe('auctionsPage', () => {
 	test('parses, keeps every declared field, and strips unknown keys', () => {
 		const parsed = auctionsPage.parse({
@@ -61,7 +56,6 @@ describe('auctionsPage', () => {
 				}
 			]
 		});
-		// declared fields survive verbatim (absent optionals stay absent)
 		expect(parsed.auctions[0]).toEqual({
 			uuid: 'abc',
 			item_name: 'Aspect of the End',
@@ -70,7 +64,6 @@ describe('auctionsPage', () => {
 			item_bytes: 'H4sIA...',
 			bin: true
 		});
-		// undeclared keys are dropped, at both levels
 		expect(Object.keys(parsed.auctions[0])).not.toContain('auctioneer');
 		expect(Object.keys(parsed.auctions[0])).not.toContain('item_lore');
 		expect(Object.keys(parsed)).not.toContain('extra_field');

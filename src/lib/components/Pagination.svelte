@@ -11,7 +11,6 @@
 	let { page = $bindable(), pageSize, total }: Props = $props();
 
 	const totalPages = $derived(Math.max(1, Math.ceil(total / pageSize)));
-	// clamp for display only; the prop is mutated solely by prev/next clicks
 	const current = $derived(Math.min(Math.max(1, page), totalPages));
 	const start = $derived(total === 0 ? 0 : (current - 1) * pageSize + 1);
 	const end = $derived(Math.min(current * pageSize, total));

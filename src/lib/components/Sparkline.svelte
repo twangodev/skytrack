@@ -2,9 +2,7 @@
 	import { line, curveMonotoneX } from 'd3-shape';
 
 	interface Props {
-		/** [unix seconds, value] ascending */
 		points: [number, number][];
-		/** stroke follows the surrounding text color by default */
 		class?: string;
 	}
 
@@ -13,8 +11,6 @@
 	const W = 100;
 	const H = 32;
 
-	// same monotone curve as the main charts, without a chart wrapper so the
-	// path is part of the prerendered html
 	const path = $derived.by(() => {
 		if (points.length < 2) return null;
 		const ts = points.map(([t]) => t);

@@ -17,14 +17,6 @@ import {
 } from '../../../src/lib/market/bucket';
 import type { BazaarProductSnapshot, AuctionItemStats } from '../../../src/lib/market/aggregate';
 
-// DEVIATION from the brief: @cloudflare/vitest-pool-workers 0.21 (this
-// project's installed version, needed for vitest 4) dropped per-test
-// storage isolation in favor of per-file isolation - see
-// https://github.com/cloudflare/workers-sdk/issues/12889. The brief's test
-// bodies assume a clean DB at the start of each test (most visibly
-// assertPopulated's "empty database" case, which would otherwise see rows
-// left behind by earlier tests in this file). Restore that per-test
-// isolation manually so every test body below is unchanged from the brief.
 beforeEach(async () => {
 	await env.DB.batch([
 		env.DB.prepare('DELETE FROM bazaar_points'),
@@ -38,7 +30,6 @@ beforeEach(async () => {
 
 const HOUR = 3_600;
 
-// Minimal snapshot: only qs.bp/qs.sp are read by the pipeline write path.
 const snap = (bp: number, sp: number) => ({ qs: { bp, sp } }) as unknown as BazaarProductSnapshot;
 
 const count = async (sql: string) => (await env.DB.prepare(sql).first<{ n: number }>())!.n;
@@ -62,7 +53,7 @@ describe('writeBazaarRun', () => {
 		await writeBazaarRun(env.DB, 1_000_000_000_000, { WHEAT: snap(99, 99) });
 		expect(await count('SELECT COUNT(*) n FROM bazaar_points')).toBe(1);
 		const p = await env.DB.prepare('SELECT buy FROM bazaar_points').first<{ buy: number }>();
-		expect(p!.buy).toBe(10.5); // first write wins, like appendSnapshot's t<=last rejection
+		expect(p!.buy).toBe(10.5);
 	});
 
 	test('registers items rows with slugs', async () => {
@@ -119,8 +110,6 @@ describe('writeAuctionRun', () => {
 		}>();
 		expect(meta!.value).toBe('1000000000000');
 
-		// upsert semantics: re-running with different official metadata updates
-		// the existing row rather than erroring or leaving it stale.
 		await writeAuctionRun(
 			env.DB,
 			1_000_000_001_000,
@@ -152,20 +141,17 @@ describe('writeAuctionRun', () => {
 			1_000_000_000_000,
 			{ OTHER_ITEM: stats },
 			{
-				'FOO-BAR': { name: 'Colliding Catalogue Entry' }, // slugs to 'foo-bar', already owned by FOO_BAR
+				'FOO-BAR': { name: 'Colliding Catalogue Entry' },
 				GOOD_ITEM: { name: 'Good Item', category: 'MISC' }
 			}
 		);
 
-		// the colliding new catalogue id never landed...
 		const colliding = await env.DB.prepare("SELECT id FROM items WHERE id='FOO-BAR'").first();
 		expect(colliding).toBeNull();
-		// ...the pre-existing owner is untouched...
 		const owner = await env.DB.prepare("SELECT name FROM items WHERE id='FOO_BAR'").first<{
 			name: string;
 		}>();
 		expect(owner!.name).toBe('Foo Bar');
-		// ...and every other write in the same run still landed.
 		const good = await env.DB.prepare("SELECT category FROM items WHERE id='GOOD_ITEM'").first<{
 			category: string;
 		}>();
@@ -199,7 +185,7 @@ describe('writeAuctionRun', () => {
 describe('rollupAll', () => {
 	test('bazaar raw->hourly: rolls aged raw points into hourly medians and deletes them; idempotent', async () => {
 		const now = 2_000_000_000;
-		const aged = now - RAW_WINDOW - 10 * HOUR; // safely past the cutoff
+		const aged = now - RAW_WINDOW - 10 * HOUR;
 		const base = Math.floor(aged / HOUR) * HOUR;
 		const pts = [0, 300, 600, 3_900].map((off, i) => ({ t: base + off, b: 10 + i, s: 5 + i }));
 		const insertRaw = () =>
@@ -224,10 +210,6 @@ describe('rollupAll', () => {
 		expect(hourly).toEqual(expected.map((p) => ({ t: p.t, buy: p.b, sell: p.s })));
 		expect(await count('SELECT COUNT(*) n FROM bazaar_points WHERE tier=0')).toBe(0);
 
-		// Crash-recovery: re-insert the SAME source rows (as if a crash left
-		// tier-0 rows undeleted and the run resumed) and roll again -
-		// INSERT OR REPLACE must reproduce byte-identical bucket VALUES, not
-		// just an unchanged row count.
 		await insertRaw();
 		await rollupAll(env.DB, now);
 		const hourlyAgain = (
@@ -239,10 +221,8 @@ describe('rollupAll', () => {
 
 	test('bazaar hourly->daily: rolls aged hourly points into daily medians and deletes them', async () => {
 		const now = 2_000_000_000;
-		const aged = now - HOURLY_WINDOW - 10 * DAY; // safely past the cutoff
+		const aged = now - HOURLY_WINDOW - 10 * DAY;
 		const base = Math.floor(aged / DAY) * DAY;
-		// spans two DAY buckets: offsets 0/3h/20h land in the first day, 26h
-		// (2h past the 24h boundary) lands in the second.
 		const pts = [0, 3 * HOUR, 20 * HOUR, 26 * HOUR].map((off, i) => ({
 			t: base + off,
 			b: 10 + i,
@@ -266,16 +246,14 @@ describe('rollupAll', () => {
 			bazaarMedian
 		);
 		expect(daily).toEqual(expected.map((p) => ({ t: p.t, buy: p.b, sell: p.s })));
-		expect(daily.length).toBeGreaterThan(1); // confirms both day buckets landed
+		expect(daily.length).toBeGreaterThan(1);
 		expect(await count('SELECT COUNT(*) n FROM bazaar_points WHERE tier=1')).toBe(0);
 	});
 
 	test('auctions raw->daily: rolls aged raw points straight into daily medians, skipping an hourly tier', async () => {
 		const now = 2_000_000_000;
-		const aged = now - RAW_WINDOW - 10 * DAY; // safely past the cutoff
+		const aged = now - RAW_WINDOW - 10 * DAY;
 		const base = Math.floor(aged / DAY) * DAY;
-		// spans two DAY buckets: offsets 0/5h land in the first day, 30h lands
-		// in the second.
 		const pts = [0, 5 * HOUR, 30 * HOUR].map((off, i) => ({
 			t: base + off,
 			l: 100 + i * 10,
@@ -303,18 +281,13 @@ describe('rollupAll', () => {
 		);
 		expect(daily).toEqual(expected.map((p) => ({ t: p.t, lowest: p.l, median: p.m, count: p.c })));
 		expect(await count('SELECT COUNT(*) n FROM auction_points WHERE tier=0')).toBe(0);
-		// auctions never pass through an intermediate tier=1 (fromTier 0 ->
-		// intoTier 2 directly).
 		expect(await count('SELECT COUNT(*) n FROM auction_points WHERE tier=1')).toBe(0);
 	});
 
 	test('bazaar raw->hourly: correctly aggregates points spanning multiple 6h slices', async () => {
 		const now = 2_000_000_000;
-		const aged = now - RAW_WINDOW - 20 * HOUR; // 20h of headroom before the cutoff
+		const aged = now - RAW_WINDOW - 20 * HOUR;
 		const base = Math.floor(aged / HOUR) * HOUR;
-		// 0h/7h/14h apart: wider than one 6h slice (sliceSeconds), so the
-		// paging loop in rollupTier must run more than once to see all of
-		// them, and each lands in its own hourly bucket.
 		const pts = [0, 7 * HOUR, 14 * HOUR].map((off, i) => ({ t: base + off, b: 10 + i, s: 5 + i }));
 		await env.DB.batch(
 			pts.map((p) =>
@@ -333,7 +306,7 @@ describe('rollupAll', () => {
 			HOUR,
 			bazaarMedian
 		);
-		expect(expected.length).toBe(3); // sanity: each point really is its own bucket
+		expect(expected.length).toBe(3);
 		expect(hourly).toEqual(expected.map((p) => ({ t: p.t, buy: p.b, sell: p.s })));
 		expect(await count('SELECT COUNT(*) n FROM bazaar_points WHERE tier=0')).toBe(0);
 	});
@@ -377,10 +350,6 @@ describe('pruneStaleSnapshots', () => {
 		expect(auctionLeft.results.map((r) => r.item)).toEqual(['FRESH']);
 	});
 
-	// Safety floor: if a whole kind failed to crawl, every one of its snapshot
-	// rows is stale and an unguarded DELETE would empty the table (wiping the
-	// catalogue the site reads). The MAX(updated) >= cutoff guard turns that
-	// case into a no-op.
 	test('keeps every row when the entire table is stale (the kind has not run)', async () => {
 		const now = 2_000_000_000;
 		await env.DB.batch([
@@ -418,8 +387,6 @@ describe('pruneStaleSnapshots', () => {
 		expect(auctionLeft.results.map((r) => r.item)).toEqual(['OLD_A', 'OLD_B']);
 	});
 
-	// The guard is per-table: a stale auction crawl must not stop the bazaar
-	// table (which did run) from being pruned.
 	test('prunes one table while the other is entirely stale', async () => {
 		const now = 2_000_000_000;
 		await env.DB.batch([

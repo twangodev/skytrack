@@ -1,8 +1,5 @@
 import nbt from 'prismarine-nbt';
 
-// item_bytes is base64(gzip(NBT)); the interesting bit is i[0].tag.ExtraAttributes.id.
-// Pets and runes store their real identity one level deeper, so expand those
-// into synthetic ids (PET_ENDER_DRAGON, RUNE_MUSIC) that group sanely.
 export async function itemIdFromBytes(itemBytes: string): Promise<string | null> {
 	try {
 		const buf = Buffer.from(itemBytes, 'base64');

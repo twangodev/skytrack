@@ -7,8 +7,8 @@
 	import { formatCompact, formatPrice } from '$lib/format';
 
 	interface Props {
-		buy: Level[]; // asks (instabuy offers), ascending ppu
-		sell: Level[]; // bids (instasell offers), descending ppu
+		buy: Level[];
+		sell: Level[];
 	}
 
 	const { buy, sell }: Props = $props();
@@ -19,7 +19,6 @@
 		points.map(([ppu, depth]) => ({ ppu, depth, side }));
 
 	const asks = $derived(toRows(cumulative(buy), 'ask'));
-	// bids arrive best-first (descending ppu); reverse so x ascends for drawing
 	const bids = $derived(toRows(cumulative(sell).toReversed(), 'bid'));
 	const rows = $derived([...bids, ...asks]);
 
@@ -44,7 +43,6 @@
 			tooltip={{ mode: 'bisect-x' }}
 		>
 			<Svg>
-				<!-- symlog keeps a thin book visible next to one orders of magnitude deeper -->
 				<Area
 					data={bids}
 					curve={curveStepAfter}

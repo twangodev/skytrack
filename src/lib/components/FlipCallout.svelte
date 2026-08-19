@@ -6,7 +6,6 @@
 	import { formatCompact, formatPrice } from '$lib/format';
 
 	interface Props {
-		/** reactive on bazaar pages, so the callout follows the live book */
 		qs: BazaarProductSnapshot['qs'];
 	}
 

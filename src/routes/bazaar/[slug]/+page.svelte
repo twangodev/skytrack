@@ -18,7 +18,6 @@
 
 	const { data } = $props();
 
-	// recreated on navigation between product pages
 	let live = $state<LiveBazaar | null>(null);
 	$effect(() => {
 		const poller = new LiveBazaar(data.id);
@@ -29,13 +28,10 @@
 
 	const isLive = $derived(live !== null && live.product !== null && !live.failed);
 	const snapshot = $derived(live?.product ? toSnapshot(live.product) : data.snapshot);
-	// timestamp must describe whatever snapshot is on screen, even if the
-	// latest poll failed and we're still showing the previous successful one
 	const updatedAt = $derived(
 		live?.product ? (live.lastUpdated ?? data.lastUpdated) : data.lastUpdated
 	);
 
-	// chart series extend to the live price so the line ticks in real time
 	const instabuy = $derived.by((): Point[] => {
 		const points: Point[] = data.history.map((h) => [h.t, h.b]);
 		if (live?.product) points.push([Math.floor(updatedAt / 1000), snapshot.qs.bp]);

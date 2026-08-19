@@ -5,7 +5,6 @@
 
 	const { tier }: Props = $props();
 
-	// theme-aware tokens defined in layout.css
 	const COLORS: Record<string, string> = {
 		COMMON: 'var(--color-muted)',
 		UNCOMMON: 'var(--rarity-uncommon)',

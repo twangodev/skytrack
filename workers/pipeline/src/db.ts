@@ -1,6 +1,3 @@
-// All D1 writes for the pipeline. Single-row prepared statements batched in
-// chunks - D1 caps bound params per statement at 100 and batches at 10k
-// statements; db.batch() is atomic per chunk.
 import type { D1Database, D1PreparedStatement } from '@cloudflare/workers-types';
 import type { BazaarProductSnapshot, AuctionItemStats } from '../../../src/lib/market/aggregate';
 import {
@@ -35,15 +32,6 @@ const metaStmt = (db: D1Database, key: string, value: string) =>
 		)
 		.bind(key, value);
 
-// name only set on first sight; the official items refresh corrects it later.
-// A UNIQUE(slug) violation from a DIFFERENT id must fail the run loudly for
-// ids that carry data of their own (auction aggregated ids here, bazaar ids
-// in writeBazaarRun) - that mirrors scripts/fetch-data.ts's old emit(), which
-// keeps a slugOwners union across every TRACKED kind and throws on a
-// cross-kind collision. The official catalogue in writeAuctionRun is
-// different: it's ~5-7k ids the old pipeline never slug-validated, so a
-// colliding NEW catalogue id is pre-checked in JS and skipped (logged, not
-// thrown) instead of aborting the whole batch - see writeAuctionRun below.
 const itemStmt = (db: D1Database, id: string, name: string) =>
 	db
 		.prepare('INSERT INTO items (id, slug, name) VALUES (?, ?, ?) ON CONFLICT(id) DO NOTHING')
@@ -80,15 +68,6 @@ export async function writeAuctionRun(
 	const t = Math.floor(lastUpdatedMs / 1000);
 	const stmts: D1PreparedStatement[] = [];
 
-	// Catalogue-slug pre-check (see the itemStmt comment above): build the
-	// current slug->id ownership map from every already-tracked item, plus
-	// the ids this run is about to give data rows to (which keep the loud
-	// failure below, so register them as owners rather than risk racing the
-	// DB's own UNIQUE(slug) error with a catalogue id). A NEW official id
-	// (i.e. not already an owner of its own slug) whose slug is already
-	// owned by a DIFFERENT id is dropped with a logged event instead of
-	// inserted, so one bad catalogue id can't take down every other item in
-	// this run.
 	const existingRows = await db
 		.prepare('SELECT id, slug FROM items')
 		.all<{ id: string; slug: string }>();
@@ -135,17 +114,9 @@ interface RollupSpec {
 	intoTier: 1 | 2;
 	windowSeconds: number;
 	bucketSeconds: number;
-	/** paging span per DB round-trip; always a multiple of bucketSeconds so
-	 *  slice boundaries stay bucket-aligned. */
 	sliceSeconds: number;
 }
 
-// Same tiering as state.ts rollup(): bazaar raw->hourly (90d, 1h buckets),
-// bazaar hourly->daily (730d, 1d), auctions raw->daily (90d, 1d). The raw
-// bazaar tier is the only one sliced tighter than its bucket: at steady
-// state (~1,788 products x 288 5-min points/day) a full DAY slice is ~515k
-// rows, uncomfortably close to the isolate's 128 MB limit; 6h keeps it to
-// ~129k while staying bucket-aligned (a multiple of HOUR).
 const ROLLUPS: RollupSpec[] = [
 	{
 		table: 'bazaar_points',
@@ -179,8 +150,6 @@ export async function rollupAll(db: D1Database, now: number): Promise<void> {
 
 async function rollupTier(db: D1Database, spec: RollupSpec, now: number): Promise<void> {
 	const { table, fromTier, intoTier, windowSeconds, bucketSeconds, sliceSeconds } = spec;
-	// Bucket-aligned cutoff: a bucket only spills once it is complete (same
-	// invariant as spill() in state.ts).
 	const cutoff = Math.floor((now - windowSeconds) / bucketSeconds) * bucketSeconds;
 	const oldest = await db
 		.prepare(`SELECT MIN(t) AS t FROM ${table} WHERE tier = ? AND t < ?`)
@@ -190,17 +159,6 @@ async function rollupTier(db: D1Database, spec: RollupSpec, now: number): Promis
 
 	const isBazaar = table === 'bazaar_points';
 	const columns = isBazaar ? 'item, t, buy, sell' : 'item, t, lowest, median, count';
-	// Page through spec.sliceSeconds per DB round-trip (see the ROLLUPS
-	// comment for the row-count reasoning) - keeps each query far under D1's
-	// 30s limit and the isolate's memory. Crash-safe: rows are only deleted
-	// after their buckets are written, and rewriting a bucket from the same
-	// rows is a no-op (INSERT OR REPLACE of identical values). The cost of
-	// that ordering is a transient double count: if the run dies between an
-	// inserted bucket chunk and the final DELETE, the tier-0 sources and their
-	// tier-1/2 buckets coexist until the next run. Only *SummaryHistory (all
-	// tiers, unfiltered) reads both, the tiered read paths window them apart,
-	// and the next maintenance run re-deletes the sources - so it self-heals
-	// within a day.
 	for (
 		let start = Math.floor(oldest.t / sliceSeconds) * sliceSeconds;
 		start < cutoff;
@@ -266,10 +224,6 @@ async function rollupTier(db: D1Database, spec: RollupSpec, now: number): Promis
 	}
 }
 
-// The MAX(updated) >= ?1 guard makes each DELETE a no-op when the entire
-// table is stale (kind hasn't run) - correct pruning when it isn't. Without
-// it a single failed crawl day would empty the snapshot table and take the
-// whole catalogue off the site until the next successful run.
 export async function pruneStaleSnapshots(db: D1Database, now: number): Promise<void> {
 	await db.batch([
 		db
@@ -285,8 +239,6 @@ export async function pruneStaleSnapshots(db: D1Database, now: number): Promise<
 	]);
 }
 
-// Replaces the BOOTSTRAP/first-deploy machinery: after the one-time history
-// import the DB is never legitimately empty, so empty means misconfiguration.
 export async function assertPopulated(db: D1Database): Promise<void> {
 	const row = await db
 		.prepare('SELECT EXISTS(SELECT 1 FROM bazaar_points) AS populated')

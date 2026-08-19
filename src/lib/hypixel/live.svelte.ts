@@ -3,7 +3,6 @@ import { BAZAAR_URL } from '$lib/hypixel/endpoints';
 
 const POLL_MS = 30_000;
 
-/** Client-side bazaar poller for a single product. Pauses while the tab is hidden. */
 export class LiveBazaar {
 	product = $state<BazaarProduct | null>(null);
 	lastUpdated = $state<number | null>(null);
@@ -38,7 +37,6 @@ export class LiveBazaar {
 		try {
 			const res = await fetch(BAZAAR_URL);
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
-			// the payload carries ~1600 products; validate only the one we show
 			const raw = (await res.json()) as {
 				lastUpdated?: number;
 				products?: Record<string, unknown>;

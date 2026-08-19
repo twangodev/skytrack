@@ -1,8 +1,5 @@
 @import 'tailwindcss';
 
-/* dark: utilities follow the .dark class mode-watcher toggles, not the OS
-   media query; otherwise an OS-dark visitor who switches the site to light
-   gets dark-variant text colors on the light background. */
 @custom-variant dark (&:where(.dark, .dark *));
 
 @font-face {
@@ -69,8 +66,6 @@
 	--color-down: #e07a70;
 }
 
-/* Skyblock rarity colors, tuned per theme (not @theme tokens - only ever
-   referenced by RarityBadge via var(), never as utilities) */
 :root {
 	--rarity-uncommon: #4d8a51;
 	--rarity-rare: #3d6cb8;

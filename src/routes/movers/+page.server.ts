@@ -60,7 +60,6 @@ export const load: PageServerLoad = async ({ platform, setHeaders }) => {
 					.sort((a, b) => a.change - b.change)
 					.slice(0, 20);
 
-				// Sparks only for the rows the page actually displays.
 				const displayedIds = [...gainers, ...losers].map((r) => r.id);
 				const sparks = await bazaarSeriesSince(db, displayedIds, now - seconds);
 				const withSpark = (row: (typeof ranked)[number]): Row => ({

@@ -12,25 +12,20 @@
 
 	interface Series {
 		label: string;
-		points: Point[]; // [unix seconds, value]
+		points: Point[];
 	}
 
 	interface Props {
-		/** hero price; reactive on bazaar pages so it ticks live */
 		current: number;
 		unit?: string;
-		/** which /data/items endpoint backs the chart */
 		slug: string;
 		kind: 'bazaar' | 'auctions';
-		/** SSR fallback + live tail; drives hero change & colors until the fetch lands */
 		primary: Series;
-		/** optional thin reference line (instasell, median BIN) */
 		secondary?: Series;
 	}
 
 	const { current, unit = 'coins', slug, kind, primary, secondary }: Props = $props();
 
-	// full-history endpoint, fetched once per item and shared across range tabs
 	const seriesCache = new Map<string, Promise<ItemSeriesJson | null>>();
 	function loadSeries(itemSlug: string): Promise<ItemSeriesJson | null> {
 		let pending = seriesCache.get(itemSlug);
@@ -49,14 +44,11 @@
 		fetched = null;
 		if (!browser) return;
 		void loadSeries(target).then((data) => {
-			// don't memoize failures - a transient blip would otherwise stick
-			// until a full page reload
 			if (data === null) seriesCache.delete(target);
 			if (target === slug) fetched = data;
 		});
 	});
 
-	// fetched history + any SSR/live points newer than its newest sample
 	const merged = $derived(fetched ? mergedSeries(fetched, kind) : []);
 	const primaryPoints = $derived.by((): Point[] => {
 		if (merged.length === 0) return primary.points;
@@ -92,8 +84,6 @@
 	};
 
 	const selectedRangeSeconds = $derived((RANGES.find((r) => r.key === range) ?? RANGES[3]).seconds);
-	// a range with under two points can't show change - fall back to ALL, and
-	// keep the label, secondary series, and candle bucket consistent with that
 	const effectiveRangeSeconds = $derived(
 		clip(primaryPoints, selectedRangeSeconds).length >= 2 ? selectedRangeSeconds : Infinity
 	);
@@ -101,8 +91,6 @@
 
 	const visible = $derived(clip(primaryPoints, effectiveRangeSeconds));
 	const visibleSecondary = $derived(clip(secondaryPoints, effectiveRangeSeconds));
-	// ALL has no fixed range — target the candle count off the real data extent
-	// so buckets don't collapse to a single 1w slot on short histories
 	const candleSpan = $derived(
 		effectiveRangeSeconds !== Infinity || visible.length < 2
 			? effectiveRangeSeconds
@@ -111,13 +99,8 @@
 	const candleBucket = $derived(pickBucket(candleSpan));
 	const candles = $derived(style === 'candles' ? bucketOHLC(visible, candleBucket) : []);
 
-	// fixed rolling window for the x axis: a 1D chart spans a continuous 24h
-	// ending now, with the line covering only the span that has data - not
-	// the data extent stretched across the full width. ALL keeps auto extent.
 	const xWindow = $derived.by((): [number, number] | undefined => {
 		if (effectiveRangeSeconds === Infinity) return undefined;
-		// anchor to the newest point (live tail keeps this at "now" on bazaar
-		// pages); a stale auctions snapshot still gets an honest full window
 		const end = Math.max(visible[visible.length - 1]?.[0] ?? 0, Math.floor(Date.now() / 1000));
 		return [end - effectiveRangeSeconds, end];
 	});
@@ -133,8 +116,6 @@
 	const stroke = $derived(
 		direction === 'up' ? 'stroke-up' : direction === 'down' ? 'stroke-down' : 'stroke-muted'
 	);
-	// explicit stops: tailwind v4 registers --tw-gradient-* with inherits:false,
-	// so layerchart's from-*/to-* class pattern resolves to transparent in svg
 	const gradientStops = $derived.by(() => {
 		const color =
 			direction === 'up'

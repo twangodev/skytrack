@@ -21,7 +21,7 @@ jobs:
       - name: Test
         run: bun run test
 
-  test-workers:
+  integration:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -30,8 +30,8 @@ jobs:
         uses: oven-sh/setup-bun@v2
       - name: Install Dependencies
         run: bun install --frozen-lockfile
-      - name: Worker Tests
-        run: bun run test:workers
+      - name: Integration
+        run: bun run integration
 
   check:
     runs-on: ubuntu-latest
@@ -66,7 +66,7 @@ jobs:
 
   deploy:
     if: github.ref == 'refs/heads/main'
-    needs: [test, test-workers, check, build]
+    needs: [test, integration, check, build]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

@@ -9,6 +9,7 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "skytrack",
+	"routes": [{ "pattern": "skytrack.twango.dev", "custom_domain": true }],
 	"main": "worker/index.ts",
 	"compatibility_date": "2026-08-01",
 	"compatibility_flags": ["nodejs_compat"],

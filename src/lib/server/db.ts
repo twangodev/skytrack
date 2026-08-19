@@ -242,7 +242,14 @@ export function bazaarWindowChanges(
 
 // Same minute-bucketed caching as bazaarWindowChanges, keyed additionally by
 // the id list in the caller's order (never sorted - that array belongs to the
-// caller and its order is meaningful to it).
+// caller and its order is meaningful to it). Results are grouped per item, so
+// only per-item ascending t matters (every call site treats it that way) -
+// hence ORDER BY item, t rather than a global ORDER BY t. That shape also
+// keeps the query fast: a global ORDER BY t lets SQLite satisfy it for free
+// off the (tier, t) index, which then scans every item's rows in the window
+// (millions of rows at production 7d size and a D1 CPU-limit reset);
+// ORDER BY item, t instead keeps the planner on the (item, tier, t) primary
+// key, doing a bounded seek per item.
 export function bazaarSeriesSince(
 	db: D1Database,
 	ids: string[],
@@ -256,9 +263,9 @@ export function bazaarSeriesSince(
 			const { results } = await db
 				.prepare(
 					`SELECT item, t, buy AS b, sell AS s FROM bazaar_points
-				 WHERE tier = 0 AND t >= ? AND item IN (${placeholders}) ORDER BY t`
+				 WHERE item IN (${placeholders}) AND tier = 0 AND t >= ? ORDER BY item, t`
 				)
-				.bind(since, ...chunk)
+				.bind(...chunk, since)
 				.all<BazaarHistoryPoint & { item: string }>();
 			for (const { item, ...point } of results) {
 				const list = out.get(item) ?? [];

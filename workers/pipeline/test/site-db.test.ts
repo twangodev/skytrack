@@ -4,6 +4,7 @@ import {
 	auctionHistory,
 	auctionSparks,
 	bazaarHistory,
+	bazaarSeriesSince,
 	bazaarSparks,
 	bazaarSummaryHistory,
 	bazaarWindowChanges,
@@ -365,4 +366,65 @@ test('bazaarWindowChanges refetches once the TTL expires', async () => {
 	} finally {
 		vi.useRealTimers();
 	}
+});
+
+// Regression pin for the production incident: a global `ORDER BY t` makes
+// SQLite pick bazaar_points_tier_t (tier=? AND t>?) because that index
+// already yields t-order for free, which scans every item's rows in the
+// window (~4.3M rows at production 7d size) instead of seeking per item.
+// `WHERE item IN (...) AND tier = 0 AND t >= ?` with `ORDER BY item, t`
+// keeps the planner on PRIMARY KEY (item=? AND tier=? AND t>?) - bounded
+// per-item seeks. This asserts the plan directly, on the exact SQL string
+// bazaarSeriesSince prepares, so a future edit that reintroduces the global
+// ordering fails here instead of in production.
+test('bazaarSeriesSince query plan stays on the primary key (regression pin for the D1 CPU-limit reset)', async () => {
+	const chunk = ['WHEAT', 'A', 'B'];
+	const placeholders = chunk.map(() => '?').join(',');
+	const sql = `SELECT item, t, buy AS b, sell AS s FROM bazaar_points
+				 WHERE item IN (${placeholders}) AND tier = 0 AND t >= ? ORDER BY item, t`;
+	const { results } = await env.DB.prepare('EXPLAIN QUERY PLAN ' + sql)
+		.bind(...chunk, now - DAY)
+		.all<{ detail: string }>();
+	const details = results.map((r) => r.detail);
+	expect(details.some((d) => d.includes('USING PRIMARY KEY'))).toBe(true);
+	expect(details.some((d) => d.includes('bazaar_points_tier_t'))).toBe(false);
+});
+
+// bazaarSeriesSince groups rows into a per-item Map; every call site (movers
+// downsample, index-page sparks/bucketing, the bazaar markdown route) only
+// needs per-item ascending t, so this asserts that ordering directly - not
+// just lengths - across two items with interleaved timestamps, seeded distinct
+// from every other bazaarSeriesSince test's `since` so the minute-bucketed
+// cache key can't collide with a value another test warmed.
+test('bazaarSeriesSince returns each item ascending by t, unaffected by interleaving', async () => {
+	const since = now - 3 * DAY;
+	await env.DB.batch([
+		env.DB.prepare(
+			'INSERT INTO bazaar_points (item, tier, t, buy, sell) VALUES (?, 0, ?, ?, ?)'
+		).bind('SERIES_A', since + 100, 1, 1),
+		env.DB.prepare(
+			'INSERT INTO bazaar_points (item, tier, t, buy, sell) VALUES (?, 0, ?, ?, ?)'
+		).bind('SERIES_B', since + 150, 2, 2),
+		env.DB.prepare(
+			'INSERT INTO bazaar_points (item, tier, t, buy, sell) VALUES (?, 0, ?, ?, ?)'
+		).bind('SERIES_A', since + 200, 3, 3),
+		env.DB.prepare(
+			'INSERT INTO bazaar_points (item, tier, t, buy, sell) VALUES (?, 0, ?, ?, ?)'
+		).bind('SERIES_B', since + 250, 4, 4),
+		env.DB.prepare(
+			'INSERT INTO bazaar_points (item, tier, t, buy, sell) VALUES (?, 0, ?, ?, ?)'
+		).bind('SERIES_A', since + 300, 5, 5)
+	]);
+
+	const series = await bazaarSeriesSince(env.DB, ['SERIES_A', 'SERIES_B'], since);
+
+	expect(series.get('SERIES_A')).toEqual([
+		{ t: since + 100, b: 1, s: 1 },
+		{ t: since + 200, b: 3, s: 3 },
+		{ t: since + 300, b: 5, s: 5 }
+	]);
+	expect(series.get('SERIES_B')).toEqual([
+		{ t: since + 150, b: 2, s: 2 },
+		{ t: since + 250, b: 4, s: 4 }
+	]);
 });

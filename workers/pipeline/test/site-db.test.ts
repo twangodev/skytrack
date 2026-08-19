@@ -145,9 +145,17 @@ test('bazaarHistory includes raw points exactly at the 24h cap, excludes just pa
 			'INSERT INTO bazaar_points (item, tier, t, buy, sell) VALUES (?, 0, ?, ?, ?)'
 		).bind('WHEAT', now - DAY - 1, 21, 20)
 	]);
-	const points = (await bazaarHistory(env.DB, 'WHEAT')).map((p) => [p.t, p.b]);
-	expect(points).toContainEqual([now - DAY, 20]);
-	expect(points).not.toContainEqual([now - DAY - 1, 21]);
+	// pin the clock: the function recomputes now at call time; on slow CI the
+	// drift pushes the boundary seed past the cap
+	vi.useFakeTimers();
+	try {
+		vi.setSystemTime(new Date(now * 1000));
+		const points = (await bazaarHistory(env.DB, 'WHEAT')).map((p) => [p.t, p.b]);
+		expect(points).toContainEqual([now - DAY, 20]);
+		expect(points).not.toContainEqual([now - DAY - 1, 21]);
+	} finally {
+		vi.useRealTimers();
+	}
 });
 
 // The hourly cap is relative to the hourly tier's newest point, not to `now`:
@@ -182,11 +190,19 @@ test('auctionHistory caps raw at 7d (daily unconditional): includes the boundary
 			'INSERT INTO auction_points (item, tier, t, lowest, median, count) VALUES (?, 0, ?, ?, ?, ?)'
 		).bind('WHEAT', now - 7 * DAY - 1, 300, 310, 7)
 	]);
-	const h = await auctionHistory(env.DB, 'WHEAT');
-	expect(h).toEqual([
-		{ t: now - 100 * DAY, l: 100, m: 110, c: 3 },
-		{ t: now - 7 * DAY, l: 200, m: 210, c: 5 }
-	]);
+	// pin the clock: the function recomputes now at call time; on slow CI the
+	// drift pushes the boundary seed past the cap
+	vi.useFakeTimers();
+	try {
+		vi.setSystemTime(new Date(now * 1000));
+		const h = await auctionHistory(env.DB, 'WHEAT');
+		expect(h).toEqual([
+			{ t: now - 100 * DAY, l: 100, m: 110, c: 3 },
+			{ t: now - 7 * DAY, l: 200, m: 210, c: 5 }
+		]);
+	} finally {
+		vi.useRealTimers();
+	}
 });
 
 // FINDING 3: prove the 60s TTL cache actually serves a cached value instead

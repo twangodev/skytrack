@@ -42,7 +42,7 @@
 		"prettier-plugin-tailwindcss": "^0.7.2",
 		"prismarine-nbt": "^2.7.0",
 		"schema-dts": "^1.1.5",
-		"sharp": "^0.34.0",
+		"sharp": "^0.35.0",
 		"svelte": "^5.55.4",
 		"svelte-check": "^4.4.6",
 		"tailwindcss": "^4.2.2",

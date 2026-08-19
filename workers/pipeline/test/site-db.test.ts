@@ -5,6 +5,7 @@ import {
 	auctionSparks,
 	bazaarHistory,
 	bazaarSeriesSince,
+	bazaarSeriesSinceSql,
 	bazaarSparks,
 	bazaarSummaryHistory,
 	bazaarWindowChanges,
@@ -374,14 +375,14 @@ test('bazaarWindowChanges refetches once the TTL expires', async () => {
 // window (~4.3M rows at production 7d size) instead of seeking per item.
 // `WHERE item IN (...) AND tier = 0 AND t >= ?` with `ORDER BY item, t`
 // keeps the planner on PRIMARY KEY (item=? AND tier=? AND t>?) - bounded
-// per-item seeks. This asserts the plan directly, on the exact SQL string
-// bazaarSeriesSince prepares, so a future edit that reintroduces the global
-// ordering fails here instead of in production.
+// per-item seeks. This asserts the plan on bazaarSeriesSinceSql, the exact
+// builder bazaarSeriesSince prepares from (not a hand-copied literal), so a
+// future edit that reintroduces the global ordering fails here structurally
+// instead of only in production.
 test('bazaarSeriesSince query plan stays on the primary key (regression pin for the D1 CPU-limit reset)', async () => {
 	const chunk = ['WHEAT', 'A', 'B'];
 	const placeholders = chunk.map(() => '?').join(',');
-	const sql = `SELECT item, t, buy AS b, sell AS s FROM bazaar_points
-				 WHERE item IN (${placeholders}) AND tier = 0 AND t >= ? ORDER BY item, t`;
+	const sql = bazaarSeriesSinceSql(placeholders);
 	const { results } = await env.DB.prepare('EXPLAIN QUERY PLAN ' + sql)
 		.bind(...chunk, now - DAY)
 		.all<{ detail: string }>();
@@ -393,9 +394,7 @@ test('bazaarSeriesSince query plan stays on the primary key (regression pin for 
 // bazaarSeriesSince groups rows into a per-item Map; every call site (movers
 // downsample, index-page sparks/bucketing, the bazaar markdown route) only
 // needs per-item ascending t, so this asserts that ordering directly - not
-// just lengths - across two items with interleaved timestamps, seeded distinct
-// from every other bazaarSeriesSince test's `since` so the minute-bucketed
-// cache key can't collide with a value another test warmed.
+// just lengths - across two items with interleaved timestamps.
 test('bazaarSeriesSince returns each item ascending by t, unaffected by interleaving', async () => {
 	const since = now - 3 * DAY;
 	await env.DB.batch([

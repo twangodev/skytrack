@@ -240,6 +240,14 @@ export function bazaarWindowChanges(
 	});
 }
 
+// Exported so workers/pipeline/test/site-db.test.ts can EXPLAIN QUERY PLAN the
+// exact statement bazaarSeriesSince prepares, rather than a hand-copied
+// literal that could silently drift from the real query - see the plan
+// regression test's comment for why that structural coupling matters.
+export const bazaarSeriesSinceSql = (placeholders: string): string =>
+	`SELECT item, t, buy AS b, sell AS s FROM bazaar_points
+	 WHERE item IN (${placeholders}) AND tier = 0 AND t >= ? ORDER BY item, t`;
+
 // Same minute-bucketed caching as bazaarWindowChanges, keyed additionally by
 // the id list in the caller's order (never sorted - that array belongs to the
 // caller and its order is meaningful to it). Results are grouped per item, so
@@ -261,10 +269,7 @@ export function bazaarSeriesSince(
 			const chunk = ids.slice(i, i + 90); // 90 + 1 binds, under D1's 100-param cap
 			const placeholders = chunk.map(() => '?').join(',');
 			const { results } = await db
-				.prepare(
-					`SELECT item, t, buy AS b, sell AS s FROM bazaar_points
-				 WHERE item IN (${placeholders}) AND tier = 0 AND t >= ? ORDER BY item, t`
-				)
+				.prepare(bazaarSeriesSinceSql(placeholders))
 				.bind(...chunk, since)
 				.all<BazaarHistoryPoint & { item: string }>();
 			for (const { item, ...point } of results) {

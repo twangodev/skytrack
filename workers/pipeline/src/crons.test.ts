@@ -34,17 +34,64 @@ function stripJsonc(text: string): string {
 	return out;
 }
 
-const config = JSON.parse(
+// Production runs everything (HTTP + crons) on skytrack-site, configured by
+// the ROOT wrangler.jsonc; workers/pipeline/wrangler.jsonc is local-dev/tests
+// only and must carry no triggers, or crons could silently fork again.
+type WranglerConfig = {
+	triggers: { crons: string[] };
+	compatibility_date: string;
+	assets: { binding: string; directory: string };
+};
+
+const rootConfig = JSON.parse(
+	stripJsonc(
+		readFileSync(fileURLToPath(new URL('../../../wrangler.jsonc', import.meta.url)), 'utf8')
+	)
+) as WranglerConfig;
+
+const pipelineConfig = JSON.parse(
 	stripJsonc(readFileSync(fileURLToPath(new URL('../wrangler.jsonc', import.meta.url)), 'utf8'))
-) as { triggers: { crons: string[] } };
+) as { triggers?: { crons: string[] } };
+
+// wrangler.build.jsonc is the adapter-facing config (@sveltejs/adapter-cloudflare
+// emits its worker to *its* main, so it can't share the root config - see
+// wrangler.jsonc's top comment). Its assets block and compatibility_date must
+// stay in lockstep with the root config's by hand; this guards that seam.
+const buildConfig = JSON.parse(
+	stripJsonc(
+		readFileSync(fileURLToPath(new URL('../../../wrangler.build.jsonc', import.meta.url)), 'utf8')
+	)
+) as WranglerConfig;
 
 describe('CRONS', () => {
 	// index.ts switches on these exact strings; a cron in wrangler.jsonc with no
 	// matching case would throw "unknown cron" on every fire, and a case with no
 	// trigger would silently never run.
-	test('matches wrangler.jsonc triggers.crons exactly', () => {
-		expect(new Set(config.triggers.crons)).toEqual(new Set(Object.values(CRONS)));
-		expect(new Set(config.triggers.crons).size).toBe(3);
+	test('matches root wrangler.jsonc triggers.crons exactly', () => {
+		expect(new Set(rootConfig.triggers.crons)).toEqual(new Set(Object.values(CRONS)));
+		expect(new Set(rootConfig.triggers.crons).size).toBe(3);
 		expect(new Set(Object.values(CRONS)).size).toBe(3);
+	});
+
+	test('pipeline wrangler.jsonc has no triggers of its own', () => {
+		expect(pipelineConfig.triggers).toBeUndefined();
+	});
+});
+
+describe('wrangler.build.jsonc / wrangler.jsonc config drift', () => {
+	// The two configs are edited by hand and can't share one file (see
+	// wrangler.jsonc's top comment); a mismatch here means the deployed
+	// worker's assets binding/directory or compatibility date would silently
+	// diverge from what the adapter built against.
+	test('assets.directory matches', () => {
+		expect(buildConfig.assets.directory).toBe(rootConfig.assets.directory);
+	});
+
+	test('assets.binding matches', () => {
+		expect(buildConfig.assets.binding).toBe(rootConfig.assets.binding);
+	});
+
+	test('compatibility_date matches', () => {
+		expect(buildConfig.compatibility_date).toBe(rootConfig.compatibility_date);
 	});
 });

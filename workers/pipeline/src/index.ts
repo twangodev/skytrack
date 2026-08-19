@@ -25,7 +25,7 @@ import {
 } from './db';
 import { CRONS } from './crons';
 
-interface Env {
+export interface Env {
 	DB: D1Database;
 	BOOTSTRAP?: string;
 }
@@ -141,19 +141,23 @@ async function maintain(env: Env): Promise<void> {
 	console.log(JSON.stringify({ event: 'maintenance' }));
 }
 
-export default {
-	async scheduled(controller, env): Promise<void> {
-		if (env.BOOTSTRAP !== '1') await assertPopulated(env.DB);
-		// a thrown error marks the invocation failed in the CF dashboard
-		switch (controller.cron) {
-			case CRONS.bazaar:
-				return refreshBazaar(env);
-			case CRONS.auctions:
-				return refreshAuctions(env);
-			case CRONS.maintenance:
-				return maintain(env);
-			default:
-				throw new Error(`unknown cron: ${controller.cron}`);
-		}
+export const handleScheduled = async (
+	controller: ScheduledController,
+	env: Env,
+	_ctx?: ExecutionContext
+): Promise<void> => {
+	if (env.BOOTSTRAP !== '1') await assertPopulated(env.DB);
+	// a thrown error marks the invocation failed in the CF dashboard
+	switch (controller.cron) {
+		case CRONS.bazaar:
+			return refreshBazaar(env);
+		case CRONS.auctions:
+			return refreshAuctions(env);
+		case CRONS.maintenance:
+			return maintain(env);
+		default:
+			throw new Error(`unknown cron: ${controller.cron}`);
 	}
-} satisfies ExportedHandler<Env>;
+};
+
+export default { scheduled: handleScheduled } satisfies ExportedHandler<Env>;

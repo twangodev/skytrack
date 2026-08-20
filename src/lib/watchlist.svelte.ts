@@ -20,8 +20,7 @@ function persist(): void {
 	if (typeof localStorage === 'undefined') return;
 	try {
 		localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-	} catch {
-	}
+	} catch {}
 }
 
 export const watchlist = {

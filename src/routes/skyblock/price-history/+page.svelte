@@ -56,7 +56,9 @@
 				</li>
 			{/each}
 			{#each data.bazaarExamples as item (item.slug)}
-				<li><a href="/bazaar/{item.slug}" class="hover:text-text">{item.name} bazaar history</a></li>
+				<li>
+					<a href="/bazaar/{item.slug}" class="hover:text-text">{item.name} bazaar history</a>
+				</li>
 			{/each}
 		</ul>
 	</section>

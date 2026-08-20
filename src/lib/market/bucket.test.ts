@@ -23,11 +23,7 @@ describe('round1', () => {
 describe('bucketMedian', () => {
 	test('groups points into aligned buckets and applies the reducer', () => {
 		const base = Math.floor(1781000000 / HOUR) * HOUR;
-		const points = [
-			{ t: base + 60 },
-			{ t: base + 120 },
-			{ t: base + HOUR + 60 }
-		];
+		const points = [{ t: base + 60 }, { t: base + 120 }, { t: base + HOUR + 60 }];
 		const result = bucketMedian(points, HOUR, (bucket, start) => ({
 			t: start,
 			count: bucket.length

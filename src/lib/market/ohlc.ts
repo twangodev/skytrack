@@ -17,17 +17,7 @@ export function bucketOHLC(points: [t: number, v: number][], bucketSeconds: numb
 }
 
 const BUCKET_LADDER = [
-	300,
-	900,
-	1800,
-	3600,
-	7200,
-	14_400,
-	21_600,
-	43_200,
-	86_400,
-	259_200,
-	604_800
+	300, 900, 1800, 3600, 7200, 14_400, 21_600, 43_200, 86_400, 259_200, 604_800
 ];
 
 export const TARGET_CANDLES = 50;

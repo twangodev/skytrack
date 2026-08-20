@@ -7,4 +7,3 @@ build/
 .DS_Store
 vite.config.ts.timestamp-*
 .wrangler/
-import-sql/

@@ -16,20 +16,20 @@ export interface ItemMeta {
 	npc?: number;
 }
 
-export interface BazaarFile {
+interface BazaarFile {
 	lastUpdated: number;
 	products: Record<string, BazaarProductSnapshot>;
 }
 
-export interface AuctionsFile {
+interface AuctionsFile {
 	lastUpdated: number;
 	items: Record<string, AuctionItemStats>;
 }
 
-export type BazaarHistoryPoint = { t: number; b: number; s: number };
-export type AuctionHistoryPoint = { t: number; l: number; m: number; c: number };
+type BazaarHistoryPoint = { t: number; b: number; s: number };
+type AuctionHistoryPoint = { t: number; l: number; m: number; c: number };
 
-export interface ExampleItem {
+interface ExampleItem {
 	slug: string;
 	name: string;
 }
@@ -37,7 +37,7 @@ export interface ExampleItem {
 const DAY = 86_400;
 const TTL_MS = 60_000;
 
-export type Db = Pick<D1Database, 'prepare' | 'batch'>;
+type Db = Pick<D1Database, 'prepare' | 'batch'>;
 
 export function requireDb(platform: App.Platform | undefined): Db {
 	if (!platform?.env.DB) error(500, 'database unavailable');

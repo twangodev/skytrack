@@ -1,12 +1,12 @@
 import { z } from 'zod';
 
-export const orderEntry = z.object({
+const orderEntry = z.object({
 	amount: z.number(),
 	pricePerUnit: z.number(),
 	orders: z.number()
 });
 
-export const quickStatus = z.object({
+const quickStatus = z.object({
 	buyPrice: z.number(),
 	sellPrice: z.number(),
 	buyVolume: z.number(),
@@ -30,7 +30,7 @@ export const bazaarResponse = z.object({
 	products: z.record(z.string(), bazaarProduct)
 });
 
-export const rawAuction = z.object({
+const rawAuction = z.object({
 	uuid: z.string(),
 	item_name: z.string(),
 	tier: z.string(),
@@ -48,7 +48,7 @@ export const auctionsPage = z.object({
 	auctions: z.array(rawAuction)
 });
 
-export const resourceItem = z.object({
+const resourceItem = z.object({
 	id: z.string(),
 	name: z.string(),
 	tier: z.string().optional(),
@@ -62,9 +62,9 @@ export const itemsResponse = z.object({
 	items: z.array(resourceItem)
 });
 
-export type OrderEntry = z.infer<typeof orderEntry>;
-export type QuickStatus = z.infer<typeof quickStatus>;
+type OrderEntry = z.infer<typeof orderEntry>;
+type QuickStatus = z.infer<typeof quickStatus>;
 export type BazaarProduct = z.infer<typeof bazaarProduct>;
-export type BazaarResponse = z.infer<typeof bazaarResponse>;
+type BazaarResponse = z.infer<typeof bazaarResponse>;
 export type RawAuction = z.infer<typeof rawAuction>;
-export type ResourceItem = z.infer<typeof resourceItem>;
+type ResourceItem = z.infer<typeof resourceItem>;

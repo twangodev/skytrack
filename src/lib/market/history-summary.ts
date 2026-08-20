@@ -1,9 +1,9 @@
-export interface HistoryValuePoint {
+interface HistoryValuePoint {
 	t: number;
 	value: number;
 }
 
-export interface HistoryExtreme {
+interface HistoryExtreme {
 	t: number;
 	value: number;
 }

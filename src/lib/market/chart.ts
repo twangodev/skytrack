@@ -1,7 +1,7 @@
 import type { Level } from './aggregate';
 
 export type Point = [x: number, y: number];
-export type Domain = [min: number, max: number];
+type Domain = [min: number, max: number];
 
 export function cumulative(levels: Level[]): Point[] {
 	let sum = 0;

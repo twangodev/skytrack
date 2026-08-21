@@ -5,7 +5,7 @@ import { cloudflareTest, readD1Migrations } from '@cloudflare/vitest-pool-worker
 export default defineConfig({
 	plugins: [
 		cloudflareTest(async () => {
-			const migrations = await readD1Migrations(path.join(__dirname, 'migrations'));
+			const migrations = await readD1Migrations(path.join(import.meta.dirname, 'migrations'));
 			return {
 				main: './test/test-worker.ts',
 				wrangler: { configPath: './wrangler.jsonc' },

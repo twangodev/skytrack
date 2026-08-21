@@ -27,7 +27,7 @@
 		"@number-flow/svelte": "^0.4.2",
 		"@sveltejs/adapter-cloudflare": "^7.2.9",
 		"@sveltejs/kit": "^2.70.3",
-		"@sveltejs/vite-plugin-svelte": "^6.2.4",
+		"@sveltejs/vite-plugin-svelte": "^7.3.0",
 		"@tailwindcss/vite": "^4.3.3",
 		"@types/d3-scale": "^4.0.9",
 		"@types/d3-shape": "^3.1.8",
@@ -47,7 +47,7 @@
 		"svelte-check": "^4.7.6",
 		"tailwindcss": "^4.3.3",
 		"typescript": "^5.9.3",
-		"vite": "^7.3.6",
+		"vite": "^8.2.2",
 		"vitest": "^4.1.11",
 		"wrangler": "^4.124.0",
 		"zod": "^4.4.3"

@@ -186,12 +186,14 @@
 				y={(d: Row) => d.primary}
 				yNice
 				padding={{ bottom: 4 }}
-				tooltip={{ mode: 'bisect-x' }}
+				tooltipContext={{ mode: 'bisect-x' }}
 			>
 				<Svg>
 					<Rule y={open} class="stroke-subtle [stroke-dasharray:2,4]" />
-					<LinearGradient stops={gradientStops} vertical let:gradient={fill}>
-						<Area y1={(d: Row) => d.primary} curve={curveMonotoneX} {fill} />
+					<LinearGradient stops={gradientStops} vertical>
+						{#snippet children({ gradient })}
+							<Area y1={(d: Row) => d.primary} curve={curveMonotoneX} fill={gradient} />
+						{/snippet}
 					</LinearGradient>
 					<Spline
 						y={(d: Row) => d.primary}
@@ -211,24 +213,30 @@
 						points={{ class: 'fill-text stroke-none', r: 3 }}
 					/>
 				</Svg>
-				<Tooltip.Root class="border border-subtle bg-surface text-xs text-text shadow-lg" let:data
-					>{@const row = data as Row}
-					<Tooltip.Header class="font-sans text-muted">{scrubLabel(row.date)}</Tooltip.Header>
-					<Tooltip.List>
-						<Tooltip.Item
-							label={primary.label}
-							value={formatPrice(row.primary)}
-							classes={{ label: 'font-sans text-muted' }}
-						/>
-						{#if secondary && row.secondary !== undefined}
-							<Tooltip.Item
-								label={secondary.label}
-								value={formatPrice(row.secondary)}
-								classes={{ label: 'font-sans text-muted' }}
-							/>
-						{/if}
-					</Tooltip.List>
-				</Tooltip.Root>
+				{#snippet tooltip({ context })}
+					<Tooltip.Root
+						{context}
+						class="border border-subtle bg-surface text-xs text-text shadow-lg"
+					>
+						{#snippet children({ data: row })}
+							<Tooltip.Header class="font-sans text-muted">{scrubLabel(row.date)}</Tooltip.Header>
+							<Tooltip.List>
+								<Tooltip.Item
+									label={primary.label}
+									value={formatPrice(row.primary)}
+									classes={{ label: 'font-sans text-muted' }}
+								/>
+								{#if secondary && row.secondary !== undefined}
+									<Tooltip.Item
+										label={secondary.label}
+										value={formatPrice(row.secondary)}
+										classes={{ label: 'font-sans text-muted' }}
+									/>
+								{/if}
+							</Tooltip.List>
+						{/snippet}
+					</Tooltip.Root>
+				{/snippet}
 			</Chart>
 		</div>
 	{/if}

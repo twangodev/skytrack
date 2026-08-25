@@ -365,7 +365,7 @@
 				y={(d: Row) => series.map((s) => d[s.key]).filter((v) => v !== undefined)}
 				yNice
 				padding={{ left: 40, bottom: 16 }}
-				tooltip={{ mode: 'bisect-x' }}
+				tooltipContext={{ mode: 'bisect-x' }}
 			>
 				<Svg>
 					<Axis
@@ -387,21 +387,30 @@
 					{/each}
 					<Highlight lines={{ class: 'stroke-muted' }} />
 				</Svg>
-				<Tooltip.Root class="border border-subtle bg-surface text-xs text-text shadow-lg" let:data
-					>{@const row = data as Row}
-					<Tooltip.Header class="font-sans text-muted">{scrubLabel(row.date)}</Tooltip.Header>
-					<Tooltip.List>
-						{#each series as s (s.key)}
-							{#if row[s.key] !== undefined}
-								<Tooltip.Item
-									label={s.item.name}
-									value={pctLabel(row[s.key])}
-									classes={{ label: 'font-sans text-muted', value: TEXTS[s.colorIndex] }}
-								/>
-							{/if}
-						{/each}
-					</Tooltip.List>
-				</Tooltip.Root>
+				{#snippet tooltip({ context })}
+					<Tooltip.Root
+						{context}
+						class="border border-subtle bg-surface text-xs text-text shadow-lg"
+					>
+						{#snippet children({ data: row })}
+							<Tooltip.Header class="font-sans text-muted">{scrubLabel(row.date)}</Tooltip.Header>
+							<Tooltip.List>
+								{#each series as s (s.key)}
+									{#if row[s.key] !== undefined}
+										<Tooltip.Item
+											label={s.item.name}
+											value={pctLabel(row[s.key])}
+											classes={{
+												label: 'font-sans text-muted',
+												value: TEXTS[s.colorIndex]
+											}}
+										/>
+									{/if}
+								{/each}
+							</Tooltip.List>
+						{/snippet}
+					</Tooltip.Root>
+				{/snippet}
 			</Chart>
 		</div>
 	{:else if allLoaded}

@@ -40,7 +40,7 @@
 			yDomain={[0, null]}
 			yScale={scaleSymlog()}
 			padding={{ bottom: 20 }}
-			tooltip={{ mode: 'bisect-x' }}
+			tooltipContext={{ mode: 'bisect-x' }}
 		>
 			<Svg>
 				<Area
@@ -58,15 +58,19 @@
 				<Rule x={mid} class="stroke-muted [stroke-dasharray:3,4]" />
 				<Highlight lines={{ class: 'stroke-muted' }} />
 			</Svg>
-			<Tooltip.Root class="border border-subtle bg-surface text-xs text-text shadow-lg" let:data>
-				<Tooltip.List>
-					<Tooltip.Item
-						label={data.side === 'bid' ? 'bid' : 'ask'}
-						value="{formatPrice(data.ppu)} · {formatCompact(data.depth)}"
-						classes={{ label: 'font-sans text-muted' }}
-					/>
-				</Tooltip.List>
-			</Tooltip.Root>
+			{#snippet tooltip({ context })}
+				<Tooltip.Root {context} class="border border-subtle bg-surface text-xs text-text shadow-lg">
+					{#snippet children({ data })}
+						<Tooltip.List>
+							<Tooltip.Item
+								label={data.side === 'bid' ? 'bid' : 'ask'}
+								value="{formatPrice(data.ppu)} · {formatCompact(data.depth)}"
+								classes={{ label: 'font-sans text-muted' }}
+							/>
+						</Tooltip.List>
+					{/snippet}
+				</Tooltip.Root>
+			{/snippet}
 		</Chart>
 	</div>
 	<div class="flex justify-between font-mono text-[10px] text-muted" aria-hidden="true">

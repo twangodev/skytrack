@@ -34,7 +34,7 @@
 		"@types/node": "^26.2.0",
 		"d3-scale": "^4.0.2",
 		"d3-shape": "^3.2.0",
-		"layerchart": "^1.0.13",
+		"layerchart": "^2.3.0",
 		"mode-watcher": "^1.1.0",
 		"png-to-ico": "^3.0.2",
 		"prettier": "^3.9.6",

@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import type { D1Database } from '@cloudflare/workers-types';
+import { eq } from 'drizzle-orm';
 import type { BazaarProductSnapshot, AuctionItemStats } from '../market/aggregate';
 import {
 	RAW_SLICE,
@@ -8,6 +8,8 @@ import {
 	type AuctionTuple
 } from '../market/series';
 import { titleCase } from '../format';
+import { useDrizzle, type D1Client } from './orm';
+import { auctionSnapshots, bazaarSnapshots, items as itemsTable, metadata } from './schema';
 
 export interface ItemMeta {
 	name: string;
@@ -37,7 +39,7 @@ interface ExampleItem {
 const DAY = 86_400;
 const TTL_MS = 60_000;
 
-type Db = Pick<D1Database, 'prepare' | 'batch'>;
+type Db = D1Client;
 
 export function requireDb(platform: App.Platform | undefined): Db {
 	if (!platform?.env.DB) error(500, 'database unavailable');
@@ -64,16 +66,7 @@ interface ItemsIndex {
 
 async function itemsIndex(db: Db): Promise<ItemsIndex> {
 	return cached('items', async () => {
-		const { results } = await db
-			.prepare('SELECT id, slug, name, tier, category, npc FROM items')
-			.all<{
-				id: string;
-				slug: string;
-				name: string;
-				tier: string | null;
-				category: string | null;
-				npc: number | null;
-			}>();
+		const results = await useDrizzle(db).select().from(itemsTable);
 		const byId: Record<string, ItemMeta> = {};
 		const slugToId = new Map<string, string>();
 		const idToSlug = new Map<string, string>();
@@ -98,33 +91,38 @@ export const getItemIdBySlug = async (db: Db, slug: string): Promise<string | un
 	(await itemsIndex(db)).slugToId.get(slug);
 
 async function metaMs(db: Db, key: string): Promise<number> {
-	const row = await db
-		.prepare('SELECT value FROM meta WHERE key = ?')
-		.bind(key)
-		.first<{ value: string }>();
+	const row = await useDrizzle(db)
+		.select({ value: metadata.value })
+		.from(metadata)
+		.where(eq(metadata.key, key))
+		.get();
 	return row ? Number(row.value) : 0;
 }
 
 export async function getBazaarSnapshot(db: Db): Promise<BazaarFile> {
 	return cached('bazaar', async () => {
-		const [{ results }, lastUpdated] = await Promise.all([
-			db.prepare('SELECT item, body FROM bazaar_snapshot').all<{ item: string; body: string }>(),
+		const [rows, lastUpdated] = await Promise.all([
+			useDrizzle(db)
+				.select({ item: bazaarSnapshots.item, body: bazaarSnapshots.body })
+				.from(bazaarSnapshots),
 			metaMs(db, 'bazaar_updated')
 		]);
 		const products: Record<string, BazaarProductSnapshot> = {};
-		for (const r of results) products[r.item] = JSON.parse(r.body);
+		for (const row of rows) products[row.item] = row.body;
 		return { lastUpdated, products };
 	});
 }
 
 export async function getAuctionSnapshot(db: Db): Promise<AuctionsFile> {
 	return cached('auctions', async () => {
-		const [{ results }, lastUpdated] = await Promise.all([
-			db.prepare('SELECT item, body FROM auction_snapshot').all<{ item: string; body: string }>(),
+		const [rows, lastUpdated] = await Promise.all([
+			useDrizzle(db)
+				.select({ item: auctionSnapshots.item, body: auctionSnapshots.body })
+				.from(auctionSnapshots),
 			metaMs(db, 'auctions_updated')
 		]);
 		const items: Record<string, AuctionItemStats> = {};
-		for (const r of results) items[r.item] = JSON.parse(r.body);
+		for (const row of rows) items[row.item] = row.body;
 		return { lastUpdated, items };
 	});
 }

@@ -18,6 +18,7 @@
 		<a href="/flips" class="transition-colors hover:text-text">flips</a>
 		<a href="/movers" class="transition-colors hover:text-text">movers</a>
 		<a href="/compare" class="transition-colors hover:text-text">compare</a>
+		<a href="/legend" class="hidden transition-colors hover:text-text sm:inline">legend</a>
 		<ThemeToggle />
 	</nav>
 </header>

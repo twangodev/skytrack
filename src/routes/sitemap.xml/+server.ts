@@ -14,6 +14,7 @@ export const GET: RequestHandler = async ({ platform }) => {
 		'/flips',
 		'/movers',
 		'/compare',
+		'/legend',
 		'/docs',
 		'/skyblock/price-history',
 		'/skyblock/bazaar-price-history',

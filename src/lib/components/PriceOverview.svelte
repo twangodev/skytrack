@@ -1,5 +1,6 @@
 <script lang="ts">
 	import NumberFlow from '@number-flow/svelte';
+	import { Maximize2 } from '@lucide/svelte';
 	import { Area, Chart, Highlight, LinearGradient, Rule, Spline, Svg, Tooltip } from 'layerchart';
 	import { scaleTime } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
@@ -256,19 +257,29 @@
 				</button>
 			{/each}
 		</div>
-		<div class="ml-auto flex gap-1" role="group" aria-label="Chart style">
-			{#each STYLES as s (s)}
-				<button
-					type="button"
-					aria-pressed={style === s}
-					onclick={() => (style = s)}
-					class="cursor-pointer rounded-md px-2.5 py-1 transition-colors {style === s
-						? `${tone} bg-surface font-semibold`
-						: 'text-muted hover:text-text'}"
-				>
-					{s}
-				</button>
-			{/each}
+		<div class="ml-auto flex gap-1">
+			<a
+				href="/legend?symbol={kind}:{slug}"
+				aria-label="Open full-screen chart workspace"
+				title="Open in Legend"
+				class="cursor-pointer rounded-md px-2 py-1 text-muted transition-colors hover:bg-surface hover:text-text"
+			>
+				<Maximize2 size={13} strokeWidth={1.5} />
+			</a>
+			<div class="flex gap-1" role="group" aria-label="Chart style">
+				{#each STYLES as s (s)}
+					<button
+						type="button"
+						aria-pressed={style === s}
+						onclick={() => (style = s)}
+						class="cursor-pointer rounded-md px-2.5 py-1 transition-colors {style === s
+							? `${tone} bg-surface font-semibold`
+							: 'text-muted hover:text-text'}"
+					>
+						{s}
+					</button>
+				{/each}
+			</div>
 		</div>
 	</div>
 </section>

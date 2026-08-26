@@ -6,6 +6,7 @@ import {
 	auctionHistory,
 	auctionSummaryHistory
 } from '$lib/server/db';
+import { MARKET_PAGE_CACHE } from '$lib/server/cache';
 import { summarizeHistory } from '$lib/market/history-summary';
 import type { PageServerLoad } from './$types';
 
@@ -20,7 +21,7 @@ export const load: PageServerLoad = async ({ params, platform, setHeaders }) => 
 	]);
 	const stats = items[id];
 	if (!stats) error(404, 'Unknown item');
-	setHeaders({ 'cache-control': 'public, max-age=0, s-maxage=60' });
+	setHeaders({ 'cache-control': MARKET_PAGE_CACHE });
 	return {
 		slug: params.slug,
 		name: stats.name,

@@ -281,14 +281,17 @@ export async function itemSeriesJson(db: Db, id: string): Promise<ItemSeriesJson
 
 const WEEK = 7 * DAY;
 const SPARK_SAMPLES = 12;
+const SPARK_ITEM_CHUNK = 80;
 
 async function sparkSamples(
 	db: Db,
 	snapshotTable: 'bazaar_snapshot' | 'auction_snapshot',
 	pointsTable: 'bazaar_points' | 'auction_points',
 	column: 'buy' | 'median',
+	ids: string[],
 	now: number
 ): Promise<Map<string, number[]>> {
+	if (ids.length === 0) return new Map();
 	const since = now - WEEK;
 	const step = WEEK / SPARK_SAMPLES;
 	const times = Array.from({ length: SPARK_SAMPLES }, (_, k) => Math.floor(since + (k + 1) * step));
@@ -298,26 +301,34 @@ async function sparkSamples(
 				`(SELECT ${column} FROM ${pointsTable} p WHERE p.item = s.item AND p.tier = 0 AND p.t >= ?1 AND p.t <= ?${k + 2} ORDER BY p.t DESC LIMIT 1) AS v${k}`
 		)
 		.join(', ');
-	const { results } = await db
-		.prepare(`SELECT s.item AS id, ${cols} FROM ${snapshotTable} s`)
-		.bind(since, ...times)
-		.all<{ id: string } & Record<string, number | null>>();
 	const out = new Map<string, number[]>();
-	for (const row of results) {
-		const values = times
-			.map((_, k) => row[`v${k}`])
-			.filter((v): v is number => v != null)
-			.map((v) => Number(v.toPrecision(4)));
-		out.set(row.id, values.length < 2 ? [] : values);
+	for (let i = 0; i < ids.length; i += SPARK_ITEM_CHUNK) {
+		const chunk = ids.slice(i, i + SPARK_ITEM_CHUNK);
+		const itemPlaceholders = chunk.map((_, k) => `?${times.length + k + 2}`).join(', ');
+		const { results } = await db
+			.prepare(
+				`SELECT s.item AS id, ${cols} FROM ${snapshotTable} s WHERE s.item IN (${itemPlaceholders})`
+			)
+			.bind(since, ...times, ...chunk)
+			.all<{ id: string } & Record<string, number | null>>();
+		for (const row of results) {
+			const values = times
+				.map((_, k) => row[`v${k}`])
+				.filter((v): v is number => v != null)
+				.map((v) => Number(v.toPrecision(4)));
+			out.set(row.id, values.length < 2 ? [] : values);
+		}
 	}
 	return out;
 }
 
-export const bazaarSparks = (db: Db, now: number) =>
-	cached('bazaarSparks', () => sparkSamples(db, 'bazaar_snapshot', 'bazaar_points', 'buy', now));
-export const auctionSparks = (db: Db, now: number) =>
-	cached('auctionSparks', () =>
-		sparkSamples(db, 'auction_snapshot', 'auction_points', 'median', now)
+export const bazaarSparks = (db: Db, ids: string[], now: number) =>
+	cached(`bazaarSparks:${ids.join(',')}`, () =>
+		sparkSamples(db, 'bazaar_snapshot', 'bazaar_points', 'buy', ids, now)
+	);
+export const auctionSparks = (db: Db, ids: string[], now: number) =>
+	cached(`auctionSparks:${ids.join(',')}`, () =>
+		sparkSamples(db, 'auction_snapshot', 'auction_points', 'median', ids, now)
 	);
 
 export async function popularAuctionItems(db: Db, limit: number): Promise<ExampleItem[]> {

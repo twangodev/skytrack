@@ -1,7 +1,8 @@
 <script lang="ts">
-	import { Search } from '@lucide/svelte';
 	import SEO from '$lib/components/SEO.svelte';
 	import LastUpdated from '$lib/components/LastUpdated.svelte';
+	import MarketListSearch from '$lib/components/MarketListSearch.svelte';
+	import Pagination from '$lib/components/Pagination.svelte';
 	import { formatCompact, formatPrice } from '$lib/format';
 	import { breadcrumbSchema } from '$lib/schema';
 	import { site } from '$lib/config';
@@ -19,35 +20,31 @@
 		{ key: 'weeklyPotential', label: 'Weekly Potential' }
 	];
 
-	let query = $state('');
-	let sortKey = $state<SortKey>('weeklyPotential');
-	let sortDir = $state<'asc' | 'desc'>('desc');
-
-	function sortBy(key: SortKey) {
-		if (sortKey === key) {
-			sortDir = sortDir === 'desc' ? 'asc' : 'desc';
-		} else {
-			sortKey = key;
-			sortDir = 'desc';
+	function listHref(page: number, sortKey: SortKey, sortDir: 'asc' | 'desc'): string {
+		const params = new URLSearchParams();
+		if (data.query.length >= 2) params.set('q', data.query);
+		if (sortKey !== 'weeklyPotential' || sortDir !== 'desc') {
+			params.set('sort', sortKey);
+			params.set('dir', sortDir);
 		}
+		if (page > 1) params.set('page', String(page));
+		const query = params.toString();
+		return query ? `/flips?${query}` : '/flips';
 	}
 
-	const filtered = $derived(
-		query.length < 2
-			? data.rows
-			: data.rows.filter((row) => row.name.toLowerCase().includes(query.toLowerCase()))
-	);
+	function pageHref(page: number): string {
+		return listHref(page, data.sortKey, data.sortDir);
+	}
 
-	const sorted = $derived(
-		[...filtered].sort((a, b) =>
-			sortDir === 'desc' ? b[sortKey] - a[sortKey] : a[sortKey] - b[sortKey]
-		)
-	);
+	function sortHref(key: SortKey): string {
+		const direction = data.sortKey === key && data.sortDir === 'desc' ? 'asc' : 'desc';
+		return listHref(1, key, direction);
+	}
 </script>
 
 <SEO
 	title="Bazaar Flips"
-	description={`Flipping margins and spreads for ${data.rows.length} profitable Hypixel Skyblock bazaar products: buy-order to sell-offer profit, margin, and weekly volume.`}
+	description={`Flipping margins and spreads for ${data.itemCount} profitable Hypixel Skyblock bazaar products: buy-order to sell-offer profit, margin, and weekly volume.`}
 	canonical="/flips"
 	jsonLd={breadcrumbSchema([
 		{ name: site.title, url: site.url },
@@ -60,18 +57,10 @@
 		<div>
 			<h1 class="text-2xl font-medium">Bazaar Flips</h1>
 			<p class="mt-1 text-sm text-muted">
-				{data.rows.length} products · <LastUpdated at={data.lastUpdated} />
+				{data.itemCount} products · <LastUpdated at={data.lastUpdated} />
 			</p>
 		</div>
-		<label class="flex items-center gap-2 rounded-md border border-subtle bg-surface px-3 py-1.5">
-			<Search size={14} strokeWidth={1.5} class="text-muted" aria-hidden="true" />
-			<input
-				type="search"
-				placeholder="Filter products…"
-				bind:value={query}
-				class="w-48 bg-transparent text-sm outline-none placeholder:text-muted"
-			/>
-		</label>
+		<MarketListSearch query={data.query} placeholder="Filter products…" />
 	</div>
 
 	<div class="overflow-x-auto">
@@ -82,25 +71,29 @@
 					{#each columns as column (column.key)}
 						<th
 							class="py-2 text-right font-normal {column.key === 'weeklyPotential' ? '' : 'pr-4'}"
-							aria-sort={sortKey === column.key
-								? sortDir === 'asc'
+							aria-sort={data.sortKey === column.key
+								? data.sortDir === 'asc'
 									? 'ascending'
 									: 'descending'
 								: undefined}
 						>
-							<button
-								type="button"
-								onclick={() => sortBy(column.key)}
-								class="transition-colors {sortKey === column.key ? 'text-text' : 'text-muted'}"
+							<a
+								href={sortHref(column.key)}
+								data-sveltekit-noscroll
+								class="transition-colors {data.sortKey === column.key ? 'text-text' : 'text-muted'}"
 							>
-								{column.label}{sortKey === column.key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
-							</button>
+								{column.label}{data.sortKey === column.key
+									? data.sortDir === 'asc'
+										? ' ↑'
+										: ' ↓'
+									: ''}
+							</a>
 						</th>
 					{/each}
 				</tr>
 			</thead>
 			<tbody>
-				{#each sorted as row (row.id)}
+				{#each data.rows as row (row.id)}
 					<tr class="border-b border-subtle/60 transition-colors hover:bg-surface">
 						<td class="py-1.5 pr-4">
 							<a href="/bazaar/{row.slug}" class="transition-colors hover:text-accent">
@@ -124,13 +117,16 @@
 					</tr>
 				{:else}
 					<tr
-						><td colspan="7" class="py-8 text-center text-muted">No products match “{query}”.</td
+						><td colspan="7" class="py-8 text-center text-muted"
+							>No products match “{data.query}”.</td
 						></tr
 					>
 				{/each}
 			</tbody>
 		</table>
 	</div>
+
+	<Pagination page={data.page} pageSize={data.pageSize} total={data.total} hrefFor={pageHref} />
 
 	<p class="text-xs text-muted">
 		Assumes buy order at instasell +0.1, sell offer at instabuy −0.1, and the 1.25% bazaar tax.

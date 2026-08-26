@@ -196,7 +196,7 @@ test('getBazaarSnapshot refetches once the TTL expires', async () => {
 	}
 });
 
-test('bazaarSparks: 12 seeked tier-0 samples per snapshot-listed product, shape rules for every edge case', async () => {
+test('bazaarSparks: 12 seeked tier-0 samples per visible snapshot product, shape rules for every edge case', async () => {
 	const HOUR4 = 4 * 3_600;
 	const since = now - 7 * DAY;
 
@@ -237,7 +237,18 @@ test('bazaarSparks: 12 seeked tier-0 samples per snapshot-listed product, shape 
 		)
 	]);
 
-	const sparks = await bazaarSparks(env.DB, now);
+	const sparks = await bazaarSparks(
+		env.DB,
+		[
+			'SPARK_FULL',
+			'SPARK_SINGLE',
+			'SPARK_OLD',
+			'SPARK_EMPTY',
+			'SPARK_TIER_ONLY',
+			'SPARK_NOT_LISTED'
+		],
+		now
+	);
 
 	const full = sparks.get('SPARK_FULL')!;
 	expect(full).toHaveLength(12);
@@ -252,6 +263,7 @@ test('bazaarSparks: 12 seeked tier-0 samples per snapshot-listed product, shape 
 	expect(sparks.get('SPARK_EMPTY')).toEqual([]);
 	expect(sparks.has('SPARK_NOT_LISTED')).toBe(false);
 	expect(sparks.get('SPARK_TIER_ONLY')).toEqual([]);
+	expect(sparks.has('WHEAT')).toBe(false);
 });
 
 test('auctionSparks samples the median column (not lowest) for snapshot-listed auction items', async () => {
@@ -267,7 +279,7 @@ test('auctionSparks samples the median column (not lowest) for snapshot-listed a
 		).bind('SPARK_AUCTION', now - DAY, 100, 200, 5, 'SPARK_AUCTION', now, 150, 250, 6)
 	]);
 
-	const sparks = await auctionSparks(env.DB, now);
+	const sparks = await auctionSparks(env.DB, ['SPARK_AUCTION'], now);
 	const values = sparks.get('SPARK_AUCTION')!;
 
 	expect(values).toEqual([200, 250]);

@@ -3,6 +3,7 @@ import { requireDb, getBazaarSnapshot, getAuctionSnapshot, getItems } from '$lib
 import { aliasesForItem } from '$lib/aliases';
 import { slugFromId } from '$lib/slug';
 import { titleCase } from '$lib/format';
+import { SEARCH_INDEX_CACHE } from '$lib/server/cache';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ platform }) => {
@@ -27,6 +28,6 @@ export const GET: RequestHandler = async ({ platform }) => {
 		}))
 	];
 	return json(index, {
-		headers: { 'Cache-Control': 'max-age=0, s-maxage=3600' }
+		headers: { 'Cache-Control': SEARCH_INDEX_CACHE }
 	});
 };

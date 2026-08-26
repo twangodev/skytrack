@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { Search } from '@lucide/svelte';
 	import SEO from '$lib/components/SEO.svelte';
 	import LastUpdated from '$lib/components/LastUpdated.svelte';
+	import MarketListSearch from '$lib/components/MarketListSearch.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import Sparkline from '$lib/components/Sparkline.svelte';
 	import { formatCompact, formatPrice } from '$lib/format';
@@ -10,21 +10,18 @@
 
 	const { data } = $props();
 
-	let query = $state('');
-	let page = $state(1);
-	const pageSize = 100;
-
-	const filtered = $derived(
-		query.length < 2
-			? data.rows
-			: data.rows.filter((row) => row.name.toLowerCase().includes(query.toLowerCase()))
-	);
-	const paged = $derived(filtered.slice((page - 1) * pageSize, page * pageSize));
+	function pageHref(page: number): string {
+		const params = new URLSearchParams();
+		if (data.query.length >= 2) params.set('q', data.query);
+		if (page > 1) params.set('page', String(page));
+		const query = params.toString();
+		return query ? `/bazaar?${query}` : '/bazaar';
+	}
 </script>
 
 <SEO
 	title="Bazaar Prices"
-	description={`Live buy and sell prices for all ${data.rows.length} Hypixel Skyblock bazaar products, with order books, market depth, and trade volume.`}
+	description={`Live buy and sell prices for all ${data.itemCount} Hypixel Skyblock bazaar products, with order books, market depth, and trade volume.`}
 	canonical="/bazaar"
 	jsonLd={breadcrumbSchema([
 		{ name: site.title, url: site.url },
@@ -37,22 +34,10 @@
 		<div>
 			<h1 class="text-2xl font-medium">Bazaar</h1>
 			<p class="mt-1 text-sm text-muted">
-				{data.rows.length} products · <LastUpdated at={data.lastUpdated} />
+				{data.itemCount} products · <LastUpdated at={data.lastUpdated} />
 			</p>
 		</div>
-		<label class="flex items-center gap-2 rounded-md border border-subtle bg-surface px-3 py-1.5">
-			<Search size={14} strokeWidth={1.5} class="text-muted" aria-hidden="true" />
-			<input
-				type="search"
-				placeholder="Filter products…"
-				value={query}
-				oninput={(e) => {
-					query = e.currentTarget.value;
-					page = 1;
-				}}
-				class="w-48 bg-transparent text-sm outline-none placeholder:text-muted"
-			/>
-		</label>
+		<MarketListSearch query={data.query} placeholder="Filter products…" />
 	</div>
 
 	<div class="overflow-x-auto">
@@ -69,7 +54,7 @@
 				</tr>
 			</thead>
 			<tbody>
-				{#each paged as row (row.id)}
+				{#each data.rows as row (row.id)}
 					<tr class="border-b border-subtle/60 transition-colors hover:bg-surface">
 						<td class="py-1.5 pr-4">
 							<a href="/bazaar/{row.slug}" class="transition-colors hover:text-accent">
@@ -107,7 +92,8 @@
 					</tr>
 				{:else}
 					<tr
-						><td colspan="7" class="py-8 text-center text-muted">No products match “{query}”.</td
+						><td colspan="7" class="py-8 text-center text-muted"
+							>No products match “{data.query}”.</td
 						></tr
 					>
 				{/each}
@@ -115,5 +101,5 @@
 		</table>
 	</div>
 
-	<Pagination bind:page pageSize={100} total={filtered.length} />
+	<Pagination page={data.page} pageSize={data.pageSize} total={data.total} hrefFor={pageHref} />
 </div>

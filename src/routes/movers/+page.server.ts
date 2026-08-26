@@ -5,6 +5,7 @@ import {
 	bazaarWindowChanges,
 	bazaarSeriesSince
 } from '$lib/server/db';
+import { MARKET_PAGE_CACHE } from '$lib/server/cache';
 import { downsample } from '$lib/server/spark';
 import { slugFromId } from '$lib/slug';
 import { titleCase } from '$lib/format';
@@ -26,7 +27,7 @@ const WINDOWS = [
 
 export const load: PageServerLoad = async ({ platform, setHeaders }) => {
 	const db = requireDb(platform);
-	setHeaders({ 'cache-control': 'public, max-age=0, s-maxage=60' });
+	setHeaders({ 'cache-control': MARKET_PAGE_CACHE });
 	const [{ lastUpdated, products }, items] = await Promise.all([
 		getBazaarSnapshot(db),
 		getItems(db)

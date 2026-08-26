@@ -6,9 +6,10 @@
 		page: number;
 		pageSize: number;
 		total: number;
+		hrefFor?: (page: number) => string;
 	}
 
-	let { page = $bindable(), pageSize, total }: Props = $props();
+	let { page = $bindable(), pageSize, total, hrefFor }: Props = $props();
 
 	const totalPages = $derived(Math.max(1, Math.ceil(total / pageSize)));
 	const current = $derived(Math.min(Math.max(1, page), totalPages));
@@ -25,29 +26,61 @@
 			{formatPrice(start)}–{formatPrice(end)} of {formatPrice(total)}
 		</span>
 		<div class="flex items-center gap-3">
-			<button
-				type="button"
-				aria-label="Previous page"
-				disabled={current <= 1}
-				onclick={() => (page = current - 1)}
-				class={buttonClass}
-			>
-				<ChevronLeft size={14} strokeWidth={1.5} aria-hidden="true" />
-				Prev
-			</button>
+			{#if current <= 1}
+				<button type="button" aria-label="Previous page" disabled class={buttonClass}>
+					<ChevronLeft size={14} strokeWidth={1.5} aria-hidden="true" />
+					Prev
+				</button>
+			{:else if hrefFor}
+				<a
+					aria-label="Previous page"
+					href={hrefFor(current - 1)}
+					class={buttonClass}
+					data-sveltekit-noscroll
+				>
+					<ChevronLeft size={14} strokeWidth={1.5} aria-hidden="true" />
+					Prev
+				</a>
+			{:else}
+				<button
+					type="button"
+					aria-label="Previous page"
+					onclick={() => (page = current - 1)}
+					class={buttonClass}
+				>
+					<ChevronLeft size={14} strokeWidth={1.5} aria-hidden="true" />
+					Prev
+				</button>
+			{/if}
 			<span class="whitespace-nowrap">
 				page {formatPrice(current)} of {formatPrice(totalPages)}
 			</span>
-			<button
-				type="button"
-				aria-label="Next page"
-				disabled={current >= totalPages}
-				onclick={() => (page = current + 1)}
-				class={buttonClass}
-			>
-				Next
-				<ChevronRight size={14} strokeWidth={1.5} aria-hidden="true" />
-			</button>
+			{#if current >= totalPages}
+				<button type="button" aria-label="Next page" disabled class={buttonClass}>
+					Next
+					<ChevronRight size={14} strokeWidth={1.5} aria-hidden="true" />
+				</button>
+			{:else if hrefFor}
+				<a
+					aria-label="Next page"
+					href={hrefFor(current + 1)}
+					class={buttonClass}
+					data-sveltekit-noscroll
+				>
+					Next
+					<ChevronRight size={14} strokeWidth={1.5} aria-hidden="true" />
+				</a>
+			{:else}
+				<button
+					type="button"
+					aria-label="Next page"
+					onclick={() => (page = current + 1)}
+					class={buttonClass}
+				>
+					Next
+					<ChevronRight size={14} strokeWidth={1.5} aria-hidden="true" />
+				</button>
+			{/if}
 		</div>
 	</nav>
 {/if}

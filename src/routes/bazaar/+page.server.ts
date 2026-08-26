@@ -1,18 +1,19 @@
 import { requireDb, getBazaarSnapshot, getItems, bazaarSparks } from '$lib/server/db';
+import { MARKET_PAGE_CACHE } from '$lib/server/cache';
+import { filterByName, normalizeListQuery, paginateRows, parseListPage } from '$lib/market/list';
 import { slugFromId } from '$lib/slug';
 import { titleCase } from '$lib/format';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ platform, setHeaders }) => {
+export const load: PageServerLoad = async ({ platform, setHeaders, url }) => {
 	const db = requireDb(platform);
-	setHeaders({ 'cache-control': 'public, max-age=0, s-maxage=60' });
+	setHeaders({ 'cache-control': MARKET_PAGE_CACHE });
 	const now = Math.floor(Date.now() / 1000);
-	const [{ lastUpdated, products }, items, sparks] = await Promise.all([
+	const [{ lastUpdated, products }, items] = await Promise.all([
 		getBazaarSnapshot(db),
-		getItems(db),
-		bazaarSparks(db, now)
+		getItems(db)
 	]);
-	const rows = Object.entries(products)
+	const allRows = Object.entries(products)
 		.map(([id, snap]) => ({
 			id,
 			slug: slugFromId(id),
@@ -21,9 +22,24 @@ export const load: PageServerLoad = async ({ platform, setHeaders }) => {
 			sp: snap.qs.sp,
 			bmw: snap.qs.bmw,
 			smw: snap.qs.smw,
-			demandShare: snap.qs.bv + snap.qs.sv === 0 ? 0 : snap.qs.sv / (snap.qs.bv + snap.qs.sv),
-			spark: sparks.get(id) ?? []
+			demandShare: snap.qs.bv + snap.qs.sv === 0 ? 0 : snap.qs.sv / (snap.qs.bv + snap.qs.sv)
 		}))
 		.sort((a, b) => a.name.localeCompare(b.name));
-	return { lastUpdated, rows };
+	const query = normalizeListQuery(url.searchParams.get('q'));
+	const page = paginateRows(
+		filterByName(allRows, query),
+		parseListPage(url.searchParams.get('page'))
+	);
+	const sparks = await bazaarSparks(
+		db,
+		page.rows.map((row) => row.id),
+		now
+	);
+	return {
+		lastUpdated,
+		itemCount: allRows.length,
+		query,
+		...page,
+		rows: page.rows.map((row) => ({ ...row, spark: sparks.get(row.id) ?? [] }))
+	};
 };

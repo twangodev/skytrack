@@ -6,8 +6,10 @@
 	import { websiteSchema } from '$lib/schema';
 	import Header from '$lib/components/Header.svelte';
 	import Footer from '$lib/components/Footer.svelte';
+	import { page } from '$app/state';
 
 	let { children } = $props();
+	const fullViewport = $derived(page.url.pathname === '/legend');
 
 	onNavigate((navigation) => {
 		if (!document.startViewTransition) return;
@@ -33,14 +35,20 @@
 	{@html `<script type="application/ld+json">${JSON.stringify(websiteSchema()).replace(/</g, '\\u003c')}${'</'}script>`}
 </svelte:head>
 
-<div class="flex min-h-svh flex-col bg-bg">
-	<div
-		class="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-10 px-6 py-6 text-text antialiased sm:px-10"
-	>
-		<Header />
-		<main class="flex flex-1 flex-col">
-			{@render children()}
-		</main>
-		<Footer />
+{#if fullViewport}
+	<main class="h-svh overflow-hidden bg-bg font-sans text-text antialiased">
+		{@render children()}
+	</main>
+{:else}
+	<div class="flex min-h-svh flex-col bg-bg">
+		<div
+			class="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-10 px-6 py-6 text-text antialiased sm:px-10"
+		>
+			<Header />
+			<main class="flex flex-1 flex-col">
+				{@render children()}
+			</main>
+			<Footer />
+		</div>
 	</div>
-</div>
+{/if}

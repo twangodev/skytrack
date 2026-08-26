@@ -53,6 +53,7 @@
 		"zod": "^4.4.3"
 	},
 	"dependencies": {
+		"drizzle-orm": "^0.45.2",
 		"gridstack": "^13.2.0"
 	}
 }

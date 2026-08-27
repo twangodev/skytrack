@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { bucketOHLC, pickBucket, TARGET_CANDLES } from './ohlc';
+import { bucketOHLC, candleBodyWidth, pickBucket, TARGET_CANDLES } from './ohlc';
 
 describe('bucketOHLC', () => {
 	test('single bucket: o=first, c=last, h=max, l=min', () => {
@@ -72,5 +72,19 @@ describe('pickBucket', () => {
 
 	test('honors a custom target count', () => {
 		expect(pickBucket(86_400, 24)).toBe(3600);
+	});
+});
+
+describe('candleBodyWidth', () => {
+	test('adapts to dense bar spacing', () => {
+		expect(candleBodyWidth(1)).toBe(1);
+		expect(candleBodyWidth(3)).toBe(3);
+		expect(candleBodyWidth(6)).toBe(5);
+	});
+
+	test('approaches the conventional 80% width without exceeding the visual cap', () => {
+		expect(candleBodyWidth(12)).toBe(9);
+		expect(candleBodyWidth(100)).toBe(12);
+		expect(candleBodyWidth(100, 10)).toBe(10);
 	});
 });

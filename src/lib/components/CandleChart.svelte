@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { formatPrice } from '$lib/format';
-	import type { Candle } from '$lib/market/ohlc';
+	import { candleBodyWidth, type Candle } from '$lib/market/ohlc';
 
 	interface Props {
 		candles: Candle[];
@@ -15,6 +15,7 @@
 
 	const W = 600;
 	const PLOT_H = 200;
+	let plotWidth = $state(W);
 
 	const xStart = $derived(xDomain?.[0] ?? window?.[0] ?? candles[0]?.t ?? 0);
 	const span = $derived.by(() => {
@@ -24,7 +25,9 @@
 		return candles[candles.length - 1].t + bucketSeconds - candles[0].t;
 	});
 	const x = $derived((t: number) => ((t - xStart) / span) * W);
-	const bodyW = $derived(Math.min(12, Math.max(1, (bucketSeconds / span) * W * 0.45)));
+	const bodyW = $derived(
+		(candleBodyWidth((bucketSeconds / span) * plotWidth) / Math.max(1, plotWidth)) * W
+	);
 
 	const domain = $derived.by((): [number, number] => {
 		if (yDomain) return yDomain;
@@ -70,6 +73,7 @@
 				</div>
 			{/if}
 			<svg
+				bind:clientWidth={plotWidth}
 				viewBox="0 0 {W} {PLOT_H}"
 				preserveAspectRatio="none"
 				class="min-h-0 w-full flex-1 select-none"

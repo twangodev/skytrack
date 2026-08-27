@@ -22,6 +22,18 @@ const BUCKET_LADDER = [
 
 export const TARGET_CANDLES = 50;
 
+/**
+ * Adaptive candle width modeled on TradingView Lightweight Charts. Dense bars
+ * remain readable while roomier bars approach 80% of their available spacing.
+ */
+export function candleBodyWidth(barSpacing: number, maxWidth = 12): number {
+	if (!Number.isFinite(barSpacing) || barSpacing <= 0) return 1;
+	if (barSpacing >= 2.5 && barSpacing <= 4) return Math.min(3, maxWidth);
+
+	const coefficient = 1 - (0.2 * Math.atan(Math.max(4, barSpacing) - 4)) / (Math.PI * 0.5);
+	return Math.min(maxWidth, Math.max(1, Math.floor(barSpacing * coefficient)));
+}
+
 export function pickBucket(rangeSeconds: number, targetCandles = TARGET_CANDLES): number {
 	const minWidth = rangeSeconds / targetCandles;
 	for (const w of BUCKET_LADDER) {

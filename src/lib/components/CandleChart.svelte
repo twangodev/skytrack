@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { formatPrice } from '$lib/format';
-	import { candleBodyWidth, type Candle } from '$lib/market/ohlc';
+	import { candleBodyWidth, nearestCandle, type Candle } from '$lib/market/ohlc';
 
 	interface Props {
 		candles: Candle[];
@@ -9,9 +9,18 @@
 		xDomain?: [number, number];
 		yDomain?: [number, number];
 		showYAxis?: boolean;
+		onhover?: (candle: Candle | null) => void;
 	}
 
-	const { candles, bucketSeconds, window, xDomain, yDomain, showYAxis = false }: Props = $props();
+	const {
+		candles,
+		bucketSeconds,
+		window,
+		xDomain,
+		yDomain,
+		showYAxis = false,
+		onhover
+	}: Props = $props();
 
 	const W = 600;
 	const PLOT_H = 200;
@@ -57,6 +66,12 @@
 				})
 			: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 	};
+
+	function scrub(event: PointerEvent) {
+		const rect = (event.currentTarget as SVGSVGElement).getBoundingClientRect();
+		const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / Math.max(1, rect.width)));
+		onhover?.(nearestCandle(candles, bucketSeconds, xStart + ratio * span) ?? null);
+	}
 </script>
 
 {#if candles.length >= 2}
@@ -74,6 +89,8 @@
 			{/if}
 			<svg
 				bind:clientWidth={plotWidth}
+				onpointermove={scrub}
+				onpointerleave={() => onhover?.(null)}
 				viewBox="0 0 {W} {PLOT_H}"
 				preserveAspectRatio="none"
 				class="min-h-0 w-full flex-1 select-none"

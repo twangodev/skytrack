@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { bucketOHLC, candleBodyWidth, pickBucket, TARGET_CANDLES } from './ohlc';
+import { bucketOHLC, candleBodyWidth, nearestCandle, pickBucket, TARGET_CANDLES } from './ohlc';
 
 describe('bucketOHLC', () => {
 	test('single bucket: o=first, c=last, h=max, l=min', () => {
@@ -86,5 +86,22 @@ describe('candleBodyWidth', () => {
 		expect(candleBodyWidth(12)).toBe(9);
 		expect(candleBodyWidth(100)).toBe(12);
 		expect(candleBodyWidth(100, 10)).toBe(10);
+	});
+});
+
+describe('nearestCandle', () => {
+	const candles = [
+		{ t: 0, o: 1, h: 2, l: 1, c: 2 },
+		{ t: 3600, o: 2, h: 3, l: 2, c: 3 },
+		{ t: 10_800, o: 3, h: 4, l: 3, c: 4 }
+	];
+
+	test('selects the candle whose center is nearest the pointer time', () => {
+		expect(nearestCandle(candles, 3600, 5200)?.t).toBe(3600);
+		expect(nearestCandle(candles, 3600, 11_000)?.t).toBe(10_800);
+	});
+
+	test('returns undefined for an empty series', () => {
+		expect(nearestCandle([], 3600, 0)).toBeUndefined();
 	});
 });

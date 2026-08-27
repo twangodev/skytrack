@@ -1,13 +1,23 @@
 <script lang="ts">
 	import NumberFlow from '@number-flow/svelte';
 	import { Maximize2 } from '@lucide/svelte';
-	import { Area, Chart, Highlight, LinearGradient, Rule, Spline, Svg, Tooltip } from 'layerchart';
+	import {
+		Area,
+		Chart,
+		Highlight,
+		LinearGradient,
+		Rule,
+		Spline,
+		Svg,
+		Tooltip,
+		type ChartState
+	} from 'layerchart';
 	import { scaleTime } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
 	import { browser } from '$app/environment';
 	import { formatPrice } from '$lib/format';
 	import type { Point } from '$lib/market/chart';
-	import { bucketOHLC, pickBucket } from '$lib/market/ohlc';
+	import { bucketOHLC, pickBucket, type Candle } from '$lib/market/ohlc';
 	import { mergedSeries, type ItemSeriesJson } from '$lib/market/series';
 	import CandleChart from '$lib/components/CandleChart.svelte';
 
@@ -108,7 +118,6 @@
 
 	const open = $derived(visible[0]?.[1] ?? current);
 	const change = $derived(current - open);
-	const changePct = $derived(open > 0 ? (change / open) * 100 : 0);
 	const direction = $derived(change > 0 ? 'up' : change < 0 ? 'down' : 'flat');
 
 	const tone = $derived(
@@ -146,6 +155,25 @@
 	});
 
 	const enough = $derived(data.length >= 2);
+	let chartContext = $state<ChartState<Row>>();
+	let hoveredCandle = $state<Candle | null>(null);
+	const hoveredRow = $derived(chartContext?.tooltipState.data ?? null);
+	const hoveredPrice = $derived(
+		style === 'candles' ? hoveredCandle?.c : (hoveredRow?.primary ?? undefined)
+	);
+	const displayedPrice = $derived(hoveredPrice ?? current);
+	const displayedChange = $derived(displayedPrice - open);
+	const displayedChangePct = $derived(open > 0 ? (displayedChange / open) * 100 : 0);
+	const displayedTone = $derived(
+		displayedChange > 0 ? 'text-up' : displayedChange < 0 ? 'text-down' : 'text-muted'
+	);
+	const hoveredDate = $derived(
+		style === 'candles'
+			? hoveredCandle
+				? new Date(hoveredCandle.t * 1000)
+				: undefined
+			: hoveredRow?.date
+	);
 
 	const scrubLabel = (date: Date) =>
 		date.toLocaleString('en-US', {
@@ -159,13 +187,19 @@
 <section class="flex flex-col gap-3">
 	<div>
 		<p class="font-mono text-3xl tabular-nums">
-			<NumberFlow value={Math.round(current * 10) / 10} format={{ maximumFractionDigits: 1 }} />
+			<NumberFlow
+				value={Math.round(displayedPrice * 10) / 10}
+				format={{ maximumFractionDigits: 1 }}
+				willChange
+			/>
 			<span class="text-sm text-muted">{unit}</span>
 		</p>
-		<p class="mt-1 font-mono text-sm tabular-nums {tone}">
-			{change >= 0 ? '+' : '−'}{formatPrice(Math.abs(change))}
-			({change >= 0 ? '+' : ''}{changePct.toFixed(2)}%)
-			<span class="font-sans text-muted">{widened ? 'all time' : rangeLabel[range]}</span>
+		<p class="mt-1 font-mono text-sm tabular-nums {displayedTone}">
+			{displayedChange >= 0 ? '+' : '−'}{formatPrice(Math.abs(displayedChange))}
+			({displayedChange >= 0 ? '+' : ''}{displayedChangePct.toFixed(2)}%)
+			<span class="font-sans text-muted"
+				>{hoveredDate ? scrubLabel(hoveredDate) : widened ? 'all time' : rangeLabel[range]}</span
+			>
 		</p>
 	</div>
 
@@ -175,7 +209,12 @@
 		</p>
 	{:else if style === 'candles'}
 		<div class="h-[220px] w-full">
-			<CandleChart {candles} bucketSeconds={candleBucket} window={xWindow} />
+			<CandleChart
+				{candles}
+				bucketSeconds={candleBucket}
+				window={xWindow}
+				onhover={(candle) => (hoveredCandle = candle)}
+			/>
 		</div>
 	{:else}
 		<div class="h-[220px] w-full font-mono text-[10px]">
@@ -188,6 +227,7 @@
 				yNice
 				padding={{ bottom: 4 }}
 				tooltipContext={{ mode: 'bisect-x' }}
+				bind:context={chartContext}
 			>
 				<Svg>
 					<Rule y={open} class="stroke-subtle [stroke-dasharray:2,4]" />

@@ -11,6 +11,7 @@
 </script>
 
 <script lang="ts">
+	import NumberFlow from '@number-flow/svelte';
 	import type { Action } from 'svelte/action';
 	import {
 		Axis,
@@ -33,7 +34,7 @@
 		zoomDomain,
 		type Domain
 	} from '$lib/market/chart';
-	import { bucketOHLC, pickBucket } from '$lib/market/ohlc';
+	import { bucketOHLC, pickBucket, type Candle } from '$lib/market/ohlc';
 	import { formatPrice } from '$lib/format';
 
 	interface Props {
@@ -118,6 +119,7 @@
 	});
 	let xViewport = $state<Domain | null>(null);
 	let yViewport = $state<Domain | null>(null);
+	let hoveredCandle = $state<Candle | null>(null);
 	const viewportKey = $derived(
 		`${primary?.key ?? ''}|${style}|${comparisons.map((series) => series.key).join(',')}`
 	);
@@ -135,6 +137,7 @@
 		void xBounds;
 		xViewport = defaultXViewport();
 		yViewport = null;
+		hoveredCandle = null;
 	});
 	const activeXDomain = $derived(xViewport ?? xBounds);
 	const candleSpan = $derived(
@@ -334,7 +337,7 @@
 		);
 	});
 	const legendDate = $derived(
-		hovered?.date ??
+		(style === 'candles' && hoveredCandle ? new Date(hoveredCandle.t * 1000) : hovered?.date) ??
 			(Number.isFinite(latestVisibleTimestamp)
 				? new Date(latestVisibleTimestamp * 1000)
 				: data.length > 0
@@ -342,6 +345,7 @@
 					: undefined)
 	);
 	const legendValue = (line: VisibleLine): number | undefined => {
+		if (style === 'candles' && hoveredCandle && line.colorIndex === 0) return hoveredCandle.c;
 		if (hovered?.[line.key] !== undefined) return hovered[line.key];
 		const start = activeXDomain?.[0] ?? -Infinity;
 		const end = activeXDomain?.[1] ?? Infinity;
@@ -350,8 +354,6 @@
 
 	const axisPrice = (value: number) => formatPrice(value);
 	const axisPercent = (value: number) => `${value.toFixed(1)}%`;
-	const formattedValue = (value: number) =>
-		hasComparisons ? `${value >= 0 ? '+' : ''}${value.toFixed(2)}%` : `${formatPrice(value)} c`;
 	const dateLabel = (date: Date) =>
 		date.toLocaleString('en-US', {
 			month: 'short',
@@ -393,6 +395,7 @@
 				xDomain={activeXDomain ?? undefined}
 				yDomain={activeYDomain ?? undefined}
 				showYAxis
+				onhover={(candle) => (hoveredCandle = candle)}
 			/>
 		</div>
 	{:else if data.length >= 2 && visibleLines.length > 0}
@@ -478,7 +481,18 @@
 						></span>
 						<span class="max-w-36 truncate text-muted">{line.name}</span>
 						<span class="font-mono tabular-nums {TEXTS[line.colorIndex]}">
-							{value === undefined ? '—' : formattedValue(value)}
+							{#if value === undefined}
+								—
+							{:else}
+								<NumberFlow
+									{value}
+									format={hasComparisons
+										? { maximumFractionDigits: 2, signDisplay: 'exceptZero' }
+										: { maximumFractionDigits: 1 }}
+									suffix={hasComparisons ? '%' : ' c'}
+									willChange
+								/>
+							{/if}
 						</span>
 					</li>
 				{/each}

@@ -16,6 +16,22 @@ export function bucketOHLC(points: [t: number, v: number][], bucketSeconds: numb
 	return candles;
 }
 
+export function nearestCandle(
+	candles: Candle[],
+	bucketSeconds: number,
+	timestamp: number
+): Candle | undefined {
+	let nearest: Candle | undefined;
+	let distance = Infinity;
+	for (const candle of candles) {
+		const nextDistance = Math.abs(candle.t + bucketSeconds / 2 - timestamp);
+		if (nextDistance >= distance) continue;
+		nearest = candle;
+		distance = nextDistance;
+	}
+	return nearest;
+}
+
 const BUCKET_LADDER = [
 	300, 900, 1800, 3600, 7200, 14_400, 21_600, 43_200, 86_400, 259_200, 604_800
 ];

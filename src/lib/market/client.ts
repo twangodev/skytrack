@@ -15,12 +15,16 @@ export type PickedMarketItem = Pick<MarketItem, 'slug' | 'name' | 'kind'>;
 
 export interface MarketSnapshotJson {
 	name: string;
-	bazaar?: { updatedAt: number; snapshot: BazaarProductSnapshot };
-	auctions?: { updatedAt: number; snapshot: AuctionItemStats };
+	bazaar?: { updatedAt: number; snapshot: BazaarProductSnapshot; live: boolean };
+	auctions?: { updatedAt: number; snapshot: AuctionItemStats; live: boolean };
 }
 
 const seriesCache = new Map<string, Promise<ItemSeriesJson | null>>();
-const snapshotCache = new Map<string, Promise<MarketSnapshotJson | null>>();
+const SNAPSHOT_CACHE_MS = 55_000;
+const snapshotCache = new Map<
+	string,
+	{ expiresAt: number; pending: Promise<MarketSnapshotJson | null> }
+>();
 let indexPromise: Promise<MarketItem[]> | null = null;
 
 export const marketItemKey = (item: PickedMarketItem): string => `${item.kind}:${item.slug}`;
@@ -64,9 +68,10 @@ export function loadMarketSeries(slug: string): Promise<ItemSeriesJson | null> {
 }
 
 export function loadMarketSnapshot(slug: string): Promise<MarketSnapshotJson | null> {
-	let pending = snapshotCache.get(slug);
-	if (!pending) {
-		pending = fetch(`/data/items/${slug}/snapshot.json`)
+	const now = Date.now();
+	let entry = snapshotCache.get(slug);
+	if (!entry || entry.expiresAt <= now) {
+		const pending = fetch(`/data/items/${slug}/snapshot.json`)
 			.then((response) =>
 				response.ok ? (response.json() as Promise<MarketSnapshotJson>) : Promise.resolve(null)
 			)
@@ -75,9 +80,14 @@ export function loadMarketSnapshot(slug: string): Promise<MarketSnapshotJson | n
 				if (snapshot === null) snapshotCache.delete(slug);
 				return snapshot;
 			});
-		snapshotCache.set(slug, pending);
+		entry = { expiresAt: now + SNAPSHOT_CACHE_MS, pending };
+		snapshotCache.set(slug, entry);
 	}
-	return pending;
+	return entry.pending;
+}
+
+export function clearMarketSnapshotCache(): void {
+	snapshotCache.clear();
 }
 
 function rankMarketItem(item: MarketItem, query: string): number {

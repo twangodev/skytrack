@@ -1,5 +1,11 @@
-import { describe, expect, test } from 'vitest';
-import { marketItemKey, searchMarketItems, type MarketItem } from './client';
+import { afterEach, describe, expect, test, vi } from 'vitest';
+import {
+	clearMarketSnapshotCache,
+	loadMarketSnapshot,
+	marketItemKey,
+	searchMarketItems,
+	type MarketItem
+} from './client';
 
 const items: MarketItem[] = [
 	{
@@ -43,5 +49,25 @@ describe('searchMarketItems', () => {
 
 	test('requires two non-whitespace characters', () => {
 		expect(searchMarketItems(items, ' d ')).toEqual([]);
+	});
+});
+
+describe('loadMarketSnapshot', () => {
+	afterEach(() => {
+		clearMarketSnapshotCache();
+		vi.unstubAllGlobals();
+	});
+
+	test('deduplicates quote requests within the client freshness window', async () => {
+		const response = {
+			name: 'Wheat',
+			bazaar: { updatedAt: 200_000, live: true, snapshot: {} }
+		};
+		const fetcher = vi.fn(async () => new Response(JSON.stringify(response)));
+		vi.stubGlobal('fetch', fetcher);
+
+		expect(await loadMarketSnapshot('wheat')).toEqual(response);
+		expect(await loadMarketSnapshot('wheat')).toEqual(response);
+		expect(fetcher).toHaveBeenCalledTimes(1);
 	});
 });

@@ -1,27 +1,29 @@
 <script lang="ts">
 	import { formatCompact, formatPrice } from '$lib/format';
 	import type { LegendWidget } from '$lib/legend/layout';
-	import { loadMarketSnapshot } from '$lib/market/client';
+	import { LiveMarket } from '$lib/market/live.svelte';
 
 	interface Props {
 		widget: LegendWidget;
 	}
 
 	const { widget }: Props = $props();
-	let snapshot = $state<Awaited<ReturnType<typeof loadMarketSnapshot>>>(null);
-	let loading = $state(false);
+	let market = $state<LiveMarket | null>(null);
 
 	$effect(() => {
 		const item = widget.item;
-		snapshot = null;
-		if (!item) return;
-		loading = true;
-		void loadMarketSnapshot(item.slug).then((value) => {
-			if (widget.item?.slug !== item.slug || widget.item.kind !== item.kind) return;
-			snapshot = value;
-			loading = false;
-		});
+		if (!item) {
+			market = null;
+			return;
+		}
+		const poller = new LiveMarket(item.slug);
+		poller.start();
+		market = poller;
+		return () => poller.stop();
 	});
+
+	const snapshot = $derived(market?.snapshot ?? null);
+	const loading = $derived(market?.loading ?? false);
 </script>
 
 {#if !widget.item}

@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { CandlestickChart, LineChart, Plus, X } from '@lucide/svelte';
 	import LegendChart, { type LegendSeries } from '$lib/components/LegendChart.svelte';
+	import LastUpdated from '$lib/components/LastUpdated.svelte';
 	import MarketSearch from '$lib/components/MarketSearch.svelte';
-	import { legendSeries } from '$lib/legend/data';
+	import { legendSeries, withLiveSnapshot } from '$lib/legend/data';
 	import type { LegendWidget } from '$lib/legend/layout';
 	import {
 		loadMarketSeries,
@@ -10,6 +11,7 @@
 		type MarketItem,
 		type PickedMarketItem
 	} from '$lib/market/client';
+	import { LiveMarket } from '$lib/market/live.svelte';
 
 	interface Props {
 		widget: LegendWidget;
@@ -20,6 +22,7 @@
 	const { widget, items, onupdate }: Props = $props();
 
 	let loaded = $state<Record<string, LegendSeries | null>>({});
+	let live = $state<LiveMarket | null>(null);
 	const requested = new Set<string>();
 
 	function request(item: PickedMarketItem) {
@@ -36,7 +39,26 @@
 		for (const comparison of widget.comparisons ?? []) request(comparison);
 	});
 
-	const primary = $derived(widget.item ? (loaded[marketItemKey(widget.item)] ?? null) : null);
+	$effect(() => {
+		const item = widget.item;
+		if (!item) {
+			live = null;
+			return;
+		}
+		const poller = new LiveMarket(item.slug);
+		poller.start();
+		live = poller;
+		return () => poller.stop();
+	});
+
+	const storedPrimary = $derived(widget.item ? (loaded[marketItemKey(widget.item)] ?? null) : null);
+	const primary = $derived(
+		storedPrimary ? withLiveSnapshot(storedPrimary, live?.snapshot ?? null) : null
+	);
+	const currentSnapshot = $derived.by(() => {
+		if (!widget.item || !live?.snapshot) return null;
+		return widget.item.kind === 'bazaar' ? live.snapshot.bazaar : live.snapshot.auctions;
+	});
 	const comparisons = $derived(
 		(widget.comparisons ?? [])
 			.map((item) => loaded[marketItemKey(item)])
@@ -90,6 +112,11 @@
 		>
 			<CandlestickChart size={12} strokeWidth={1.5} />
 		</button>
+		{#if currentSnapshot}
+			<span class="shrink-0 text-[8px] text-muted">
+				<LastUpdated at={currentSnapshot.updatedAt} live={currentSnapshot.live} />
+			</span>
+		{/if}
 		<div class="group relative ml-auto shrink-0">
 			<button
 				type="button"

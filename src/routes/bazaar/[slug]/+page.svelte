@@ -12,34 +12,32 @@
 	import { formatPrice } from '$lib/format';
 	import { breadcrumbSchema, itemPageSchema, priceHistoryDatasetSchema } from '$lib/schema';
 	import { site } from '$lib/config';
-	import { LiveBazaar } from '$lib/hypixel/live.svelte';
-	import { toSnapshot } from '$lib/market/aggregate';
+	import { LiveMarket } from '$lib/market/live.svelte';
 	import type { Point } from '$lib/market/chart';
 
 	const { data } = $props();
 
-	let live = $state<LiveBazaar | null>(null);
+	let live = $state<LiveMarket | null>(null);
 	$effect(() => {
-		const poller = new LiveBazaar(data.id);
+		const poller = new LiveMarket(data.slug);
 		poller.start();
 		live = poller;
 		return () => poller.stop();
 	});
 
-	const isLive = $derived(live !== null && live.product !== null && !live.failed);
-	const snapshot = $derived(live?.product ? toSnapshot(live.product) : data.snapshot);
-	const updatedAt = $derived(
-		live?.product ? (live.lastUpdated ?? data.lastUpdated) : data.lastUpdated
-	);
+	const liveBazaar = $derived(live?.snapshot?.bazaar ?? null);
+	const isLive = $derived(liveBazaar?.live ?? false);
+	const snapshot = $derived(liveBazaar?.snapshot ?? data.snapshot);
+	const updatedAt = $derived(liveBazaar?.updatedAt ?? data.lastUpdated);
 
 	const instabuy = $derived.by((): Point[] => {
 		const points: Point[] = data.history.map((h) => [h.t, h.b]);
-		if (live?.product) points.push([Math.floor(updatedAt / 1000), snapshot.qs.bp]);
+		if (liveBazaar) points.push([Math.floor(updatedAt / 1000), snapshot.qs.bp]);
 		return points;
 	});
 	const instasell = $derived.by((): Point[] => {
 		const points: Point[] = data.history.map((h) => [h.t, h.s]);
-		if (live?.product) points.push([Math.floor(updatedAt / 1000), snapshot.qs.sp]);
+		if (liveBazaar) points.push([Math.floor(updatedAt / 1000), snapshot.qs.sp]);
 		return points;
 	});
 

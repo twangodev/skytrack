@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { formatCompact, formatPrice } from '$lib/format';
+	import LastUpdated from '$lib/components/LastUpdated.svelte';
 	import { clipPoints, seriesStats } from '$lib/market/chart';
 	import { legendSeries, primaryMetric, secondaryMetric } from '$lib/legend/data';
 	import type { LegendWidget } from '$lib/legend/layout';
-	import { loadMarketSeries, loadMarketSnapshot } from '$lib/market/client';
+	import { loadMarketSeries } from '$lib/market/client';
+	import { LiveMarket } from '$lib/market/live.svelte';
 
 	interface Props {
 		widget: LegendWidget;
@@ -11,23 +13,38 @@
 
 	const { widget }: Props = $props();
 	let series = $state<ReturnType<typeof legendSeries> | null>(null);
-	let snapshot = $state<Awaited<ReturnType<typeof loadMarketSnapshot>>>(null);
-	let loading = $state(false);
+	let market = $state<LiveMarket | null>(null);
+	let seriesLoading = $state(false);
 
 	$effect(() => {
 		const item = widget.item;
 		series = null;
-		snapshot = null;
 		if (!item) return;
-		loading = true;
-		void Promise.all([loadMarketSeries(item.slug), loadMarketSnapshot(item.slug)]).then(
-			([json, current]) => {
-				if (widget.item?.slug !== item.slug || widget.item.kind !== item.kind) return;
-				series = json ? legendSeries(item, json) : null;
-				snapshot = current;
-				loading = false;
-			}
-		);
+		seriesLoading = true;
+		void loadMarketSeries(item.slug).then((json) => {
+			if (widget.item?.slug !== item.slug || widget.item.kind !== item.kind) return;
+			series = json ? legendSeries(item, json) : null;
+			seriesLoading = false;
+		});
+	});
+
+	$effect(() => {
+		const item = widget.item;
+		if (!item) {
+			market = null;
+			return;
+		}
+		const poller = new LiveMarket(item.slug);
+		poller.start();
+		market = poller;
+		return () => poller.stop();
+	});
+
+	const snapshot = $derived(market?.snapshot ?? null);
+	const loading = $derived(seriesLoading || (market?.loading ?? false));
+	const currentSnapshot = $derived.by(() => {
+		if (!widget.item || !snapshot) return null;
+		return widget.item.kind === 'bazaar' ? snapshot.bazaar : snapshot.auctions;
 	});
 
 	const recent = $derived(series ? clipPoints(series.points, 86_400) : []);
@@ -59,6 +76,11 @@
 			{current === null ? '—' : formatPrice(current)}
 			<span class="text-[9px] text-muted">coins</span>
 		</p>
+		{#if currentSnapshot}
+			<p class="mt-1 text-[9px] text-muted">
+				<LastUpdated at={currentSnapshot.updatedAt} live={currentSnapshot.live} />
+			</p>
+		{/if}
 		{#if stats}
 			<p class="mt-1 font-mono text-[10px] tabular-nums {positive ? 'text-up' : 'text-down'}">
 				{stats.change >= 0 ? '+' : '−'}{formatPrice(Math.abs(stats.change))}

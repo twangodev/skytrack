@@ -15,8 +15,8 @@ export const GET: RequestHandler = async ({ platform }) => {
 
 Skytrack tracks the Hypixel Skyblock in-game economy using only the official Hypixel API:
 
-- **Bazaar** (${bazaarCount} products): live order books with instabuy/instasell prices, market depth, volume, and order counts. Pages poll the official API in the browser, so displayed prices are real-time.
-- **Auction House** (${auctionCount} items): lowest and median buy-it-now (BIN) prices aggregated from every active BIN listing, refreshed roughly every 3 hours. Bazaar pages refresh every 15 minutes.
+- **Bazaar** (${bazaarCount} products): live order books with instabuy/instasell prices, market depth, volume, and order counts. Item pages poll Skytrack's cached live snapshot, so displayed prices stay current without each browser hitting Hypixel directly.
+- **Auction House** (${auctionCount} items): lowest and median buy-it-now (BIN) prices aggregated from every active BIN listing, refreshed roughly every 15 minutes. Bazaar history refreshes every 5 minutes, while item pages also show a cached live snapshot.
 
 Item URLs use the slug — the lowercase item id with hyphens — for example [enchanted-diamond on the Bazaar](${site.url}/bazaar/enchanted-diamond) or [wither-boots in the Auction House](${site.url}/auctions/wither-boots). Every item page embeds current prices in its HTML and JSON-LD, so no JavaScript is required to read them.
 

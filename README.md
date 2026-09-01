@@ -12,7 +12,8 @@ In another terminal, seed local D1 by hitting the pipeline's cron endpoints:
 
 ```sh
 curl "http://localhost:8787/__scheduled?cron=*%2F5+*+*+*+*"    # bazaar data
-curl "http://localhost:8787/__scheduled?cron=10+*%2F3+*+*+*"   # items + auction data (a few minutes)
+curl "http://localhost:8787/__scheduled?cron=15+4+*+*+*"       # item catalog
+curl "http://localhost:8787/__scheduled?cron=7%2C22%2C37%2C52+*+*+*+*" # auction data
 curl "http://localhost:8787/__scheduled?cron=30+4+*+*+*"       # daily rollup + prune (optional)
 ```
 

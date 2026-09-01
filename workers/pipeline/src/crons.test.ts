@@ -56,8 +56,8 @@ const buildConfig = JSON.parse(
 describe('CRONS', () => {
 	test('matches root wrangler.jsonc triggers.crons exactly', () => {
 		expect(new Set(rootConfig.triggers.crons)).toEqual(new Set(Object.values(CRONS)));
-		expect(new Set(rootConfig.triggers.crons).size).toBe(3);
-		expect(new Set(Object.values(CRONS)).size).toBe(3);
+		expect(new Set(rootConfig.triggers.crons).size).toBe(4);
+		expect(new Set(Object.values(CRONS)).size).toBe(4);
 	});
 
 	test('pipeline wrangler.jsonc has no triggers of its own', () => {

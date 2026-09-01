@@ -37,6 +37,55 @@ const itemStmt = (db: D1Database, id: string, name: string) =>
 		.prepare('INSERT INTO items (id, slug, name) VALUES (?, ?, ?) ON CONFLICT(id) DO NOTHING')
 		.bind(id, slugFromId(id), name);
 
+export async function readItemCatalog(db: D1Database): Promise<Record<string, ItemMeta>> {
+	const { results } = await db.prepare('SELECT id, name, tier, category, npc FROM items').all<{
+		id: string;
+		name: string;
+		tier: string | null;
+		category: string | null;
+		npc: number | null;
+	}>();
+	return Object.fromEntries(
+		results.map((row) => [
+			row.id,
+			{
+				name: row.name,
+				...(row.tier !== null && { tier: row.tier }),
+				...(row.category !== null && { category: row.category }),
+				...(row.npc !== null && { npc: row.npc })
+			}
+		])
+	);
+}
+
+export async function writeItemCatalog(
+	db: D1Database,
+	items: Record<string, ItemMeta>
+): Promise<void> {
+	const existingRows = await db
+		.prepare('SELECT id, slug FROM items')
+		.all<{ id: string; slug: string }>();
+	const slugOwners = new Map(existingRows.results.map((row) => [row.slug, row.id]));
+	const official = db.prepare(
+		'INSERT INTO items (id, slug, name, tier, category, npc) VALUES (?, ?, ?, ?, ?, ?) ' +
+			'ON CONFLICT(id) DO UPDATE SET name = excluded.name, tier = excluded.tier, category = excluded.category, npc = excluded.npc'
+	);
+	const statements: D1PreparedStatement[] = [];
+	for (const [id, meta] of Object.entries(items)) {
+		const slug = slugFromId(id);
+		const owner = slugOwners.get(slug);
+		if (owner !== undefined && owner !== id) {
+			console.error(JSON.stringify({ event: 'catalogue-slug-collision', id, slug, owner }));
+			continue;
+		}
+		slugOwners.set(slug, id);
+		statements.push(
+			official.bind(id, slug, meta.name, meta.tier ?? null, meta.category ?? null, meta.npc ?? null)
+		);
+	}
+	await batchChunked(db, statements);
+}
+
 export async function writeBazaarRun(
 	db: D1Database,
 	lastUpdatedMs: number,
@@ -62,37 +111,16 @@ export async function writeBazaarRun(
 export async function writeAuctionRun(
 	db: D1Database,
 	lastUpdatedMs: number,
-	items: Record<string, AuctionItemStats>,
-	officialItems: Record<string, ItemMeta>
+	items: Record<string, AuctionItemStats>
 ): Promise<void> {
 	const t = Math.floor(lastUpdatedMs / 1000);
 	const stmts: D1PreparedStatement[] = [];
-
-	const existingRows = await db
-		.prepare('SELECT id, slug FROM items')
-		.all<{ id: string; slug: string }>();
-	const slugOwners = new Map(existingRows.results.map((r) => [r.slug, r.id]));
-	for (const id of Object.keys(items)) {
-		const slug = slugFromId(id);
-		if (!slugOwners.has(slug)) slugOwners.set(slug, id);
-	}
-
-	const official = db.prepare(
-		'INSERT INTO items (id, slug, name, tier, category, npc) VALUES (?, ?, ?, ?, ?, ?) ' +
-			'ON CONFLICT(id) DO UPDATE SET name = excluded.name, tier = excluded.tier, category = excluded.category, npc = excluded.npc'
-	);
-	for (const [id, meta] of Object.entries(officialItems)) {
-		const slug = slugFromId(id);
-		const owner = slugOwners.get(slug);
-		if (owner !== undefined && owner !== id) {
-			console.error(JSON.stringify({ event: 'catalogue-slug-collision', id, slug, owner }));
-			continue;
-		}
-		slugOwners.set(slug, id);
-		stmts.push(
-			official.bind(id, slug, meta.name, meta.tier ?? null, meta.category ?? null, meta.npc ?? null)
-		);
-	}
+	const previousHistory = await db
+		.prepare("SELECT value FROM meta WHERE key = 'auctions_history_updated'")
+		.first<{ value: string }>();
+	const historyIntervalMs = 3 * 60 * 60 * 1000;
+	const recordHistory =
+		!previousHistory || lastUpdatedMs - Number(previousHistory.value) >= historyIntervalMs;
 	const snap = db.prepare(
 		'INSERT INTO auction_snapshot (item, body, updated) VALUES (?, ?, ?) ON CONFLICT(item) DO UPDATE SET body = excluded.body, updated = excluded.updated'
 	);
@@ -102,9 +130,10 @@ export async function writeAuctionRun(
 	for (const [id, stats] of Object.entries(items)) {
 		stmts.push(itemStmt(db, id, stats.name));
 		stmts.push(snap.bind(id, JSON.stringify(stats), t));
-		stmts.push(point.bind(id, t, stats.lowestBin, stats.medianBin, stats.count));
+		if (recordHistory) stmts.push(point.bind(id, t, stats.lowestBin, stats.medianBin, stats.count));
 	}
 	stmts.push(metaStmt(db, 'auctions_updated', String(lastUpdatedMs)));
+	if (recordHistory) stmts.push(metaStmt(db, 'auctions_history_updated', String(lastUpdatedMs)));
 	await batchChunked(db, stmts);
 }
 

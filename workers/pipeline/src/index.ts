@@ -11,6 +11,8 @@ import { itemIdFromBytes } from '../../../src/lib/hypixel/nbt';
 import {
 	writeBazaarRun,
 	writeAuctionRun,
+	readItemCatalog,
+	writeItemCatalog,
 	rollupAll,
 	pruneStaleSnapshots,
 	assertPopulated,
@@ -50,13 +52,7 @@ async function refreshBazaar(env: Env): Promise<void> {
 	console.log(JSON.stringify({ event: 'bazaar', products: Object.keys(products).length }));
 }
 
-function cleanName(auction: RawAuction, id: string): string {
-	if (id.startsWith('PET_')) return auction.item_name.replace(/^\[Lvl \d+\] /, '') + ' Pet';
-	if (id.startsWith('RUNE_')) return auction.item_name.replace(/^◆ /, '').replace(/ [IVXLC]+$/, '');
-	return auction.item_name;
-}
-
-async function refreshAuctions(env: Env): Promise<void> {
+async function refreshCatalog(env: Env): Promise<void> {
 	const itemsData = await fetchJson(ITEMS_URL, itemsResponse);
 	const items: Record<string, ItemMeta> = {};
 	for (const item of itemsData.items) {
@@ -67,22 +63,52 @@ async function refreshAuctions(env: Env): Promise<void> {
 			...(item.npc_sell_price !== undefined && { npc: item.npc_sell_price })
 		};
 	}
+	await writeItemCatalog(env.DB, items);
+	console.log(JSON.stringify({ event: 'catalog', items: Object.keys(items).length }));
+}
 
-	const first = await fetchJson(`${AUCTIONS_URL}?page=0`, auctionsPage);
+function cleanName(auction: RawAuction, id: string): string {
+	if (id.startsWith('PET_')) return auction.item_name.replace(/^\[Lvl \d+\] /, '') + ' Pet';
+	if (id.startsWith('RUNE_')) return auction.item_name.replace(/^◆ /, '').replace(/ [IVXLC]+$/, '');
+	return auction.item_name;
+}
+
+async function refreshAuctions(env: Env): Promise<void> {
+	let items = await readItemCatalog(env.DB);
+	if (Object.keys(items).length === 0) {
+		await refreshCatalog(env);
+		items = await readItemCatalog(env.DB);
+	}
+
+	let first: Awaited<ReturnType<typeof auctionsPage.parse>> | null = null;
 	const byUuid = new Map<string, RawAuction>();
 	const collect = (page: { auctions: RawAuction[] }) => {
 		for (const a of page.auctions) byUuid.set(a.uuid, a);
 	};
-	collect(first);
-	const remaining = Array.from({ length: first.totalPages - 1 }, (_, i) => i + 1);
-	const concurrency = 6;
-	for (let i = 0; i < remaining.length; i += concurrency) {
-		const chunk = remaining.slice(i, i + concurrency);
-		const fetched = await Promise.all(
-			chunk.map((page) => fetchJson(`${AUCTIONS_URL}?page=${page}`, auctionsPage))
-		);
-		for (const page of fetched) collect(page);
+	for (let snapshotAttempt = 0; snapshotAttempt < 2; snapshotAttempt++) {
+		byUuid.clear();
+		first = await fetchJson(`${AUCTIONS_URL}?page=0`, auctionsPage);
+		collect(first);
+		const remaining = Array.from({ length: first.totalPages - 1 }, (_, i) => i + 1);
+		const concurrency = 6;
+		let consistent = true;
+		for (let i = 0; i < remaining.length; i += concurrency) {
+			const chunk = remaining.slice(i, i + concurrency);
+			const fetched = await Promise.all(
+				chunk.map((page) => fetchJson(`${AUCTIONS_URL}?page=${page}`, auctionsPage))
+			);
+			if (fetched.some((page) => page.lastUpdated !== first?.lastUpdated)) {
+				consistent = false;
+				break;
+			}
+			for (const page of fetched) collect(page);
+		}
+		if (consistent) break;
+		first = null;
+		console.warn('auction snapshot changed while paging; retrying');
+		await sleep(1000);
 	}
+	if (!first) throw new Error('auction snapshot changed during both paging attempts');
 	const auctions = [...byUuid.values()];
 	const bins = auctions.filter((a) => a.bin === true && a.claimed !== true);
 
@@ -108,7 +134,7 @@ async function refreshAuctions(env: Env): Promise<void> {
 	}
 
 	const aggregated = aggregateBins(decoded);
-	await writeAuctionRun(env.DB, first.lastUpdated, aggregated, items);
+	await writeAuctionRun(env.DB, first.lastUpdated, aggregated);
 	console.log(
 		JSON.stringify({
 			event: 'auctions',
@@ -138,6 +164,8 @@ export const handleScheduled = async (
 			return refreshBazaar(env);
 		case CRONS.auctions:
 			return refreshAuctions(env);
+		case CRONS.catalog:
+			return refreshCatalog(env);
 		case CRONS.maintenance:
 			return maintain(env);
 		default:

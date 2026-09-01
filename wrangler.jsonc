@@ -6,7 +6,9 @@
 	"compatibility_date": "2026-08-01",
 	"compatibility_flags": ["nodejs_compat"],
 	"assets": { "binding": "ASSETS", "directory": ".svelte-kit/cloudflare" },
-	"triggers": { "crons": ["*/5 * * * *", "10 */3 * * *", "30 4 * * *"] },
+	"triggers": {
+		"crons": ["*/5 * * * *", "7,22,37,52 * * * *", "15 4 * * *", "30 4 * * *"]
+	},
 	"limits": { "cpu_ms": 300000 },
 	"d1_databases": [
 		{

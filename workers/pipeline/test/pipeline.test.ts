@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, test } from 'vitest';
 import {
 	writeBazaarRun,
 	writeAuctionRun,
+	readItemCatalog,
+	writeItemCatalog,
 	rollupAll,
 	pruneStaleSnapshots,
 	assertPopulated
@@ -66,7 +68,7 @@ describe('writeBazaarRun', () => {
 });
 
 describe('writeAuctionRun', () => {
-	test('writes snapshot, points, meta, and upserts official item metadata', async () => {
+	test('writes fresh snapshots while keeping history at a three-hour cadence', async () => {
 		const stats: AuctionItemStats = {
 			name: 'Hyperion',
 			tier: 'LEGENDARY',
@@ -74,14 +76,10 @@ describe('writeAuctionRun', () => {
 			medianBin: 95_000_000,
 			count: 12
 		};
-		await writeAuctionRun(
-			env.DB,
-			1_000_000_000_000,
-			{ HYPERION: stats },
-			{
-				HYPERION: { name: 'Hyperion', tier: 'LEGENDARY', category: 'SWORD', npc: 1_000_000 }
-			}
-		);
+		await writeItemCatalog(env.DB, {
+			HYPERION: { name: 'Hyperion', tier: 'LEGENDARY', category: 'SWORD', npc: 1_000_000 }
+		});
+		await writeAuctionRun(env.DB, 1_000_000_000_000, { HYPERION: stats });
 
 		const item = await env.DB.prepare(
 			"SELECT slug, name, tier, category, npc FROM items WHERE id='HYPERION'"
@@ -110,18 +108,22 @@ describe('writeAuctionRun', () => {
 		}>();
 		expect(meta!.value).toBe('1000000000000');
 
-		await writeAuctionRun(
-			env.DB,
-			1_000_000_001_000,
-			{ HYPERION: stats },
-			{
-				HYPERION: { name: 'Hyperion', tier: 'LEGENDARY', category: 'SWORD', npc: 2_000_000 }
-			}
-		);
+		await writeItemCatalog(env.DB, {
+			HYPERION: { name: 'Hyperion', tier: 'LEGENDARY', category: 'SWORD', npc: 2_000_000 }
+		});
+		await writeAuctionRun(env.DB, 1_000_000_001_000, { HYPERION: stats });
 		const updated = await env.DB.prepare("SELECT npc FROM items WHERE id='HYPERION'").first<{
 			npc: number;
 		}>();
 		expect(updated!.npc).toBe(2_000_000);
+		expect(await count('SELECT COUNT(*) n FROM auction_points')).toBe(1);
+
+		await writeAuctionRun(env.DB, 1_000_010_800_000, { HYPERION: stats });
+		expect(await count('SELECT COUNT(*) n FROM auction_points')).toBe(2);
+		expect((await readItemCatalog(env.DB)).HYPERION).toMatchObject({
+			name: 'Hyperion',
+			npc: 2_000_000
+		});
 	});
 
 	test('a new never-tracked official id colliding with an existing slug is skipped, run completes', async () => {
@@ -136,15 +138,11 @@ describe('writeAuctionRun', () => {
 			medianBin: 120,
 			count: 3
 		};
-		await writeAuctionRun(
-			env.DB,
-			1_000_000_000_000,
-			{ OTHER_ITEM: stats },
-			{
-				'FOO-BAR': { name: 'Colliding Catalogue Entry' },
-				GOOD_ITEM: { name: 'Good Item', category: 'MISC' }
-			}
-		);
+		await writeItemCatalog(env.DB, {
+			'FOO-BAR': { name: 'Colliding Catalogue Entry' },
+			GOOD_ITEM: { name: 'Good Item', category: 'MISC' }
+		});
+		await writeAuctionRun(env.DB, 1_000_000_000_000, { OTHER_ITEM: stats });
 
 		const colliding = await env.DB.prepare("SELECT id FROM items WHERE id='FOO-BAR'").first();
 		expect(colliding).toBeNull();
@@ -177,7 +175,7 @@ describe('writeAuctionRun', () => {
 			count: 2
 		};
 		await expect(
-			writeAuctionRun(env.DB, 1_000_000_000_000, { 'BAZ-QUX': stats }, {})
+			writeAuctionRun(env.DB, 1_000_000_000_000, { 'BAZ-QUX': stats })
 		).rejects.toThrow();
 	});
 });

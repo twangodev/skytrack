@@ -16,6 +16,7 @@
 	import {
 		Axis,
 		Chart,
+		ChartClipPath,
 		Grid,
 		Highlight,
 		Rule,
@@ -156,11 +157,21 @@
 				: visibleLines.flatMap((line) =>
 						line.points.filter(([timestamp]) => inViewport(timestamp)).map(([, value]) => value)
 					);
+		if (style !== 'candles' && !hasComparisons && primary?.secondary) {
+			values.push(
+				...primary.secondary.points
+					.filter(([timestamp]) => inViewport(timestamp))
+					.map(([, value]) => value)
+			);
+		}
 		if (values.length === 0) {
 			values =
 				style === 'candles' && candles.length > 0
 					? candles.flatMap((candle) => [candle.l, candle.h])
 					: visibleLines.flatMap((line) => line.points.map(([, value]) => value));
+			if (style !== 'candles' && !hasComparisons && primary?.secondary) {
+				values.push(...primary.secondary.points.map(([, value]) => value));
+			}
 		}
 		if (values.length === 0) return null;
 		const min = Math.min(...values);
@@ -180,14 +191,22 @@
 		| { pointerId: number; x: number; y: number; width: number; height: number; mode: DragMode }
 		| undefined;
 	let dragMode = $state<DragMode | null>(null);
+	let chartContext = $state<ChartState<Row>>();
+
+	function clearHover() {
+		chartContext?.tooltipState.hide();
+		hoveredCandle = null;
+	}
 
 	function resetViewport() {
+		clearHover();
 		xViewport = defaultXViewport();
 		yViewport = null;
 	}
 
 	function onWheel(event: WheelEvent) {
 		if (!xBounds || !yBounds) return;
+		clearHover();
 		const target = event.currentTarget as HTMLElement;
 		const rect = target.getBoundingClientRect();
 		const x = Math.min(rect.width, Math.max(0, event.clientX - rect.left));
@@ -234,6 +253,7 @@
 
 	function onPointerDown(event: PointerEvent) {
 		if (event.button !== 0 || !xBounds || !yBounds) return;
+		clearHover();
 		const target = event.currentTarget as HTMLElement;
 		const rect = target.getBoundingClientRect();
 		const x = event.clientX - rect.left;
@@ -325,7 +345,6 @@
 		};
 	};
 
-	let chartContext = $state<ChartState<Row>>();
 	const hovered = $derived(chartContext?.tooltipState.data ?? null);
 	const latestVisibleTimestamp = $derived.by(() => {
 		const end = activeXDomain?.[1] ?? Infinity;
@@ -405,8 +424,10 @@
 				x="date"
 				xScale={scaleTime()}
 				xDomain={chartXDomain}
-				y={(row: Row) =>
-					visibleLines.map((line) => row[line.key]).filter((value) => value !== undefined)}
+				y={(row: Row) => [
+					...visibleLines.map((line) => row[line.key]).filter((value) => value !== undefined),
+					...(!hasComparisons && row.secondary !== undefined ? [row.secondary] : [])
+				]}
 				yDomain={activeYDomain ?? undefined}
 				yNice={false}
 				padding={{ left: 60, right: 18, top: 8, bottom: 28 }}
@@ -414,7 +435,34 @@
 				bind:context={chartContext}
 			>
 				<Svg>
-					<Grid x={false} class="stroke-subtle/70" />
+					<ChartClipPath>
+						<Grid x={false} class="stroke-subtle/70" />
+						{#if hasComparisons}
+							<Rule y={0} class="stroke-subtle [stroke-dasharray:2,4]" />
+						{/if}
+						{#each visibleLines as line (line.key)}
+							<Spline
+								y={(row: Row) => row[line.key]}
+								curve={curveMonotoneX}
+								defined={(row: Row) => row[line.key] !== undefined}
+								class="fill-none stroke-[1.75] [stroke-linecap:round] [stroke-linejoin:round] {STROKES[
+									line.colorIndex
+								]}"
+							/>
+						{/each}
+						{#if !hasComparisons && primary.secondary}
+							<Spline
+								y={(row: Row) => row.secondary}
+								curve={curveMonotoneX}
+								defined={(row: Row) => row.secondary !== undefined}
+								class="fill-none stroke-muted/60 stroke-1 [stroke-dasharray:2,3]"
+							/>
+						{/if}
+						<Highlight
+							lines={{ class: 'stroke-muted' }}
+							points={{ class: 'fill-bg stroke-text', r: 3 }}
+						/>
+					</ChartClipPath>
 					<Axis
 						placement="left"
 						format={hasComparisons ? axisPercent : axisPrice}
@@ -426,31 +474,6 @@
 						tickLabelProps={{ class: 'fill-muted stroke-none' }}
 						tickMarks={false}
 						rule={{ class: 'stroke-subtle' }}
-					/>
-					{#if hasComparisons}
-						<Rule y={0} class="stroke-subtle [stroke-dasharray:2,4]" />
-					{/if}
-					{#each visibleLines as line (line.key)}
-						<Spline
-							y={(row: Row) => row[line.key]}
-							curve={curveMonotoneX}
-							defined={(row: Row) => row[line.key] !== undefined}
-							class="fill-none stroke-[1.75] [stroke-linecap:round] [stroke-linejoin:round] {STROKES[
-								line.colorIndex
-							]}"
-						/>
-					{/each}
-					{#if !hasComparisons && primary.secondary}
-						<Spline
-							y={(row: Row) => row.secondary}
-							curve={curveMonotoneX}
-							defined={(row: Row) => row.secondary !== undefined}
-							class="fill-none stroke-muted/60 stroke-1 [stroke-dasharray:2,3]"
-						/>
-					{/if}
-					<Highlight
-						lines={{ class: 'stroke-muted' }}
-						points={{ class: 'fill-bg stroke-text', r: 3 }}
 					/>
 				</Svg>
 				{#snippet tooltip({ context })}

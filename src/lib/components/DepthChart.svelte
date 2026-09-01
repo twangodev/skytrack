@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Area, Chart, Highlight, Rule, Svg, Tooltip } from 'layerchart';
+	import { Area, Chart, ChartClipPath, Highlight, Rule, Svg, Tooltip } from 'layerchart';
 	import { scaleSymlog } from 'd3-scale';
 	import { curveStepAfter } from 'd3-shape';
 	import type { Level } from '$lib/market/aggregate';
@@ -43,20 +43,22 @@
 			tooltipContext={{ mode: 'bisect-x' }}
 		>
 			<Svg>
-				<Area
-					data={bids}
-					curve={curveStepAfter}
-					class="fill-up/15"
-					line={{ class: 'stroke-up stroke-[1.5]' }}
-				/>
-				<Area
-					data={asks}
-					curve={curveStepAfter}
-					class="fill-down/15"
-					line={{ class: 'stroke-down stroke-[1.5]' }}
-				/>
-				<Rule x={mid} class="stroke-muted [stroke-dasharray:3,4]" />
-				<Highlight lines={{ class: 'stroke-muted' }} />
+				<ChartClipPath>
+					<Area
+						data={bids}
+						curve={curveStepAfter}
+						class="fill-up/15"
+						line={{ class: 'stroke-up stroke-[1.5]' }}
+					/>
+					<Area
+						data={asks}
+						curve={curveStepAfter}
+						class="fill-down/15"
+						line={{ class: 'stroke-down stroke-[1.5]' }}
+					/>
+					<Rule x={mid} class="stroke-muted [stroke-dasharray:3,4]" />
+					<Highlight lines={{ class: 'stroke-muted' }} />
+				</ChartClipPath>
 			</Svg>
 			{#snippet tooltip({ context })}
 				<Tooltip.Root {context} class="border border-subtle bg-surface text-xs text-text shadow-lg">

@@ -20,7 +20,7 @@
 
 <script lang="ts">
 	import { Search, X } from '@lucide/svelte';
-	import { Axis, Chart, Highlight, Rule, Spline, Svg, Tooltip } from 'layerchart';
+	import { Axis, Chart, ChartClipPath, Highlight, Rule, Spline, Svg, Tooltip } from 'layerchart';
 	import { scaleTime } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
 	import { browser } from '$app/environment';
@@ -368,24 +368,26 @@
 				tooltipContext={{ mode: 'bisect-x' }}
 			>
 				<Svg>
+					<ChartClipPath>
+						<Rule y={0} class="stroke-subtle [stroke-dasharray:2,4]" />
+						{#each series as s (s.key)}
+							<Spline
+								y={(d: Row) => d[s.key]}
+								curve={curveMonotoneX}
+								defined={(d: Row) => d[s.key] !== undefined}
+								class="fill-none stroke-[1.75] [stroke-linecap:round] [stroke-linejoin:round] {STROKES[
+									s.colorIndex
+								]}"
+							/>
+						{/each}
+						<Highlight lines={{ class: 'stroke-muted' }} />
+					</ChartClipPath>
 					<Axis
 						placement="left"
 						format={(n: number) => n.toFixed(1) + '%'}
 						tickLabelProps={{ class: 'fill-muted stroke-none' }}
 					/>
 					<Axis placement="bottom" tickLabelProps={{ class: 'fill-muted stroke-none' }} />
-					<Rule y={0} class="stroke-subtle [stroke-dasharray:2,4]" />
-					{#each series as s (s.key)}
-						<Spline
-							y={(d: Row) => d[s.key]}
-							curve={curveMonotoneX}
-							defined={(d: Row) => d[s.key] !== undefined}
-							class="fill-none stroke-[1.75] [stroke-linecap:round] [stroke-linejoin:round] {STROKES[
-								s.colorIndex
-							]}"
-						/>
-					{/each}
-					<Highlight lines={{ class: 'stroke-muted' }} />
 				</Svg>
 				{#snippet tooltip({ context })}
 					<Tooltip.Root

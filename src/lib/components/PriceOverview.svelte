@@ -4,6 +4,7 @@
 	import {
 		Area,
 		Chart,
+		ChartClipPath,
 		Highlight,
 		LinearGradient,
 		Rule,
@@ -223,36 +224,39 @@
 				x="date"
 				xScale={scaleTime()}
 				xDomain={xWindow ? [new Date(xWindow[0] * 1000), new Date(xWindow[1] * 1000)] : undefined}
-				y={(d: Row) => d.primary}
+				y={(d: Row) =>
+					secondary && d.secondary !== undefined ? [d.primary, d.secondary] : d.primary}
 				yNice
 				padding={{ bottom: 4 }}
 				tooltipContext={{ mode: 'bisect-x' }}
 				bind:context={chartContext}
 			>
 				<Svg>
-					<Rule y={open} class="stroke-subtle [stroke-dasharray:2,4]" />
-					<LinearGradient stops={gradientStops} vertical>
-						{#snippet children({ gradient })}
-							<Area y1={(d: Row) => d.primary} curve={curveMonotoneX} fill={gradient} />
-						{/snippet}
-					</LinearGradient>
-					<Spline
-						y={(d: Row) => d.primary}
-						curve={curveMonotoneX}
-						class="fill-none stroke-[1.75] [stroke-linecap:round] [stroke-linejoin:round] {stroke}"
-					/>
-					{#if secondary}
+					<ChartClipPath>
+						<Rule y={open} class="stroke-subtle [stroke-dasharray:2,4]" />
+						<LinearGradient stops={gradientStops} vertical>
+							{#snippet children({ gradient })}
+								<Area y1={(d: Row) => d.primary} curve={curveMonotoneX} fill={gradient} />
+							{/snippet}
+						</LinearGradient>
 						<Spline
-							y={(d: Row) => d.secondary}
+							y={(d: Row) => d.primary}
 							curve={curveMonotoneX}
-							defined={(d: Row) => d.secondary !== undefined}
-							class="fill-none stroke-muted/60 stroke-1 [stroke-dasharray:2,3]"
+							class="fill-none stroke-[1.75] [stroke-linecap:round] [stroke-linejoin:round] {stroke}"
 						/>
-					{/if}
-					<Highlight
-						lines={{ class: 'stroke-muted' }}
-						points={{ class: 'fill-text stroke-none', r: 3 }}
-					/>
+						{#if secondary}
+							<Spline
+								y={(d: Row) => d.secondary}
+								curve={curveMonotoneX}
+								defined={(d: Row) => d.secondary !== undefined}
+								class="fill-none stroke-muted/60 stroke-1 [stroke-dasharray:2,3]"
+							/>
+						{/if}
+						<Highlight
+							lines={{ class: 'stroke-muted' }}
+							points={{ class: 'fill-text stroke-none', r: 3 }}
+						/>
+					</ChartClipPath>
 				</Svg>
 				{#snippet tooltip({ context })}
 					<Tooltip.Root

@@ -32,6 +32,7 @@ Data last refreshed: ${updated}
 
 - [Item markdown summary](${site.url}/bazaar/enchanted-diamond.md): append .md to any item URL (/bazaar/{slug}.md or /auctions/{slug}.md)
 - [Price history JSON](${site.url}/data/items/enchanted-diamond.json): 15-min raw, hourly, and daily tiers at /data/items/{slug}.json
+- [Price history CSV](${site.url}/data/items/enchanted-diamond.csv): chronological spreadsheet-ready history at /data/items/{slug}.csv
 - [Item directory JSON](${site.url}/search-index.json): every tracked item with its slug and type
 - [OpenAPI 3.1 spec](${site.url}/openapi.json): full description of the JSON endpoints
 - [Full item directory](${site.url}/llms-full.txt): plain-text list of every item with current prices

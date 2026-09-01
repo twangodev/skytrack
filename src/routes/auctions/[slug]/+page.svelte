@@ -52,6 +52,7 @@
 						url: `${site.url}/auctions/${data.slug}`,
 						description,
 						dataUrl: `${site.url}/data/items/${data.slug}.json`,
+						csvUrl: `${site.url}/data/items/${data.slug}.csv`,
 						markdownUrl: `${site.url}/auctions/${data.slug}.md`,
 						dateModified: new Date(data.lastUpdated).toISOString(),
 						variables: ['lowest BIN price', 'median BIN price', 'active listings'],
@@ -98,6 +99,7 @@
 		secondaryMetricLabel="median BIN"
 		summary={data.summary}
 		dataUrl={`/data/items/${data.slug}.json`}
+		csvUrl={`/data/items/${data.slug}.csv`}
 		markdownUrl={`/auctions/${data.slug}.md`}
 	/>
 

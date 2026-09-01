@@ -61,6 +61,7 @@ export interface PriceHistoryDatasetOptions {
 	url: string;
 	description: string;
 	dataUrl: string;
+	csvUrl: string;
 	markdownUrl: string;
 	dateModified: string;
 	variables: string[];
@@ -93,6 +94,11 @@ export function priceHistoryDatasetSchema(opts: PriceHistoryDatasetOptions): obj
 				'@type': 'DataDownload',
 				contentUrl: opts.dataUrl,
 				encodingFormat: 'application/json'
+			},
+			{
+				'@type': 'DataDownload',
+				contentUrl: opts.csvUrl,
+				encodingFormat: 'text/csv'
 			},
 			{
 				'@type': 'DataDownload',

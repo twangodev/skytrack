@@ -9,6 +9,7 @@
 		secondaryMetricLabel: string;
 		summary: HistorySummary | null;
 		dataUrl: string;
+		csvUrl: string;
 		markdownUrl: string;
 	}
 
@@ -19,6 +20,7 @@
 		secondaryMetricLabel,
 		summary,
 		dataUrl,
+		csvUrl,
 		markdownUrl
 	}: Props = $props();
 
@@ -118,6 +120,9 @@
 		{#if summary}
 			<a href={dataUrl} class="underline decoration-subtle underline-offset-2 hover:text-text"
 				>JSON</a
+			>
+			<span aria-hidden="true"> · </span>
+			<a href={csvUrl} class="underline decoration-subtle underline-offset-2 hover:text-text">CSV</a
 			>
 			<span aria-hidden="true"> · </span>
 		{/if}

@@ -72,6 +72,7 @@
 						url: `${site.url}/bazaar/${data.slug}`,
 						description,
 						dataUrl: `${site.url}/data/items/${data.slug}.json`,
+						csvUrl: `${site.url}/data/items/${data.slug}.csv`,
 						markdownUrl: `${site.url}/bazaar/${data.slug}.md`,
 						dateModified: new Date(data.lastUpdated).toISOString(),
 						variables: ['instabuy price', 'instasell price'],
@@ -120,6 +121,7 @@
 		secondaryMetricLabel="instasell"
 		summary={data.summary}
 		dataUrl={`/data/items/${data.slug}.json`}
+		csvUrl={`/data/items/${data.slug}.csv`}
 		markdownUrl={`/bazaar/${data.slug}.md`}
 	/>
 

@@ -84,6 +84,33 @@ export const GET: RequestHandler = () => {
 					}
 				}
 			},
+			'/data/items/{slug}.csv': {
+				get: {
+					summary: 'Download price history for one item as CSV',
+					description:
+						'Chronological, flattened history with timestamp, ISO datetime, market, source tier, bazaar prices, auction prices, and listing count columns. Fields that do not apply to a market are empty.',
+					parameters: [
+						{
+							name: 'slug',
+							in: 'path',
+							required: true,
+							schema: { type: 'string' },
+							example: 'enchanted-diamond'
+						}
+					],
+					responses: {
+						'200': {
+							description: 'CSV download containing the complete tiered history for the item',
+							content: {
+								'text/csv': {
+									schema: { type: 'string' }
+								}
+							}
+						},
+						'404': { description: 'Unknown item' }
+					}
+				}
+			},
 			'/search-index.json': {
 				get: {
 					summary: 'Directory of all tracked items',

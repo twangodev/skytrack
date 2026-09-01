@@ -12,6 +12,12 @@
 		},
 		{
 			method: 'GET',
+			path: '/data/items/{slug}.csv',
+			example: '/data/items/enchanted-diamond.csv',
+			text: 'The same complete item history as a chronological CSV download for spreadsheets and data tools. Rows identify their market and source tier; fields that do not apply to that market are empty.'
+		},
+		{
+			method: 'GET',
 			path: '/search-index.json',
 			example: '/search-index.json',
 			text: 'Directory of every tracked item: slug, display name, kind (bazaar or auctions), and common aliases for search.'
@@ -45,7 +51,7 @@
 
 <SEO
 	title="API"
-	description="Free static JSON, markdown, and plain-text endpoints for Hypixel Skyblock market history, described by an OpenAPI 3.1 spec."
+	description="Free JSON, CSV, markdown, and plain-text endpoints for Hypixel Skyblock market history, described by an OpenAPI 3.1 spec."
 	canonical="/docs"
 	jsonLd={breadcrumbSchema([
 		{ name: site.title, url: site.url },

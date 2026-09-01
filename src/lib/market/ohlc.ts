@@ -36,7 +36,7 @@ const BUCKET_LADDER = [
 	300, 900, 1800, 3600, 7200, 14_400, 21_600, 43_200, 86_400, 259_200, 604_800
 ];
 
-export const TARGET_CANDLES = 50;
+export const TARGET_CANDLES = 60;
 
 /**
  * Adaptive candle width modeled on TradingView Lightweight Charts. Dense bars

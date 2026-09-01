@@ -58,7 +58,7 @@ describe('pickBucket', () => {
 	test('picks the smallest nice bucket that meets the target', () => {
 		expect(pickBucket(86_400)).toBe(1800);
 		expect(pickBucket(7 * 86_400)).toBe(14_400);
-		expect(pickBucket(30 * 86_400)).toBe(86_400);
+		expect(pickBucket(30 * 86_400)).toBe(43_200);
 	});
 
 	test('never buckets below the 5m source cadence', () => {

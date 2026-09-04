@@ -81,10 +81,6 @@ jobs:
         with:
           name: site-build
           path: .svelte-kit/
-      - name: Apply D1 migrations
-        run: bunx wrangler d1 migrations apply skytrack --remote
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       - name: Deploy
         run: bunx wrangler deploy
         env:

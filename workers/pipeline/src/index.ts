@@ -13,8 +13,7 @@ import {
 	writeAuctionRun,
 	readItemCatalog,
 	writeItemCatalog,
-	rollupAll,
-	pruneStaleSnapshots,
+	finalizePackedDays,
 	assertPopulated,
 	type ItemMeta
 } from './db';
@@ -148,9 +147,8 @@ async function refreshAuctions(env: Env): Promise<void> {
 
 async function maintain(env: Env): Promise<void> {
 	const now = Math.floor(Date.now() / 1000);
-	await rollupAll(env.DB, now);
-	await pruneStaleSnapshots(env.DB, now);
-	console.log(JSON.stringify({ event: 'maintenance' }));
+	const finalized = await finalizePackedDays(env.DB, now);
+	console.log(JSON.stringify({ event: 'maintenance', finalized }));
 }
 
 export const handleScheduled = async (

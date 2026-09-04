@@ -9,17 +9,23 @@ import {
 	bazaarSparks,
 	bazaarSummaryHistory,
 	bazaarWindowChanges,
+	clearDbCache,
 	getBazaarSnapshot,
 	getItemIdBySlug,
 	itemSeriesJson,
 	resolveBazaarId
 } from '../../../src/lib/server/db';
+import { DAY_SHARDS, SNAPSHOT_SHARDS, shardFor, utcDay } from '../../../src/lib/market/packed';
 
 const DAY = 86_400;
 const now = Math.floor(Date.now() / 1000);
 
 beforeEach(async () => {
+	clearDbCache();
 	await env.DB.batch([
+		env.DB.prepare('DELETE FROM market_item_days'),
+		env.DB.prepare('DELETE FROM market_day_shards'),
+		env.DB.prepare('DELETE FROM market_snapshot_shards'),
 		env.DB.prepare('DELETE FROM bazaar_points'),
 		env.DB.prepare('DELETE FROM bazaar_snapshot'),
 		env.DB.prepare('DELETE FROM auction_points'),
@@ -81,6 +87,34 @@ test('snapshot round-trips shape and lastUpdated', async () => {
 	const snap = await getBazaarSnapshot(env.DB);
 	expect(snap.lastUpdated).toBe(now * 1000);
 	expect(snap.products.WHEAT.qs.bp).toBe(10);
+});
+
+test('packed snapshot shards replace the legacy snapshot atomically for readers', async () => {
+	const packedUpdated = (now + 60) * 1000;
+	const packed = { qs: { bp: 42, sp: 41, bmw: 10, smw: 9 } };
+	const targetShard = shardFor('WHEAT', SNAPSHOT_SHARDS.bazaar);
+	await env.DB.batch(
+		Array.from({ length: SNAPSHOT_SHARDS.bazaar }, (_, shard) =>
+			env.DB.prepare(
+				'INSERT INTO market_snapshot_shards (market, shard, updated, body) VALUES (?, ?, ?, ?)'
+			).bind(
+				'bazaar',
+				shard,
+				packedUpdated,
+				JSON.stringify(shard === targetShard ? { WHEAT: packed } : {})
+			)
+		)
+	);
+	vi.useFakeTimers();
+	try {
+		vi.setSystemTime(new Date());
+		vi.advanceTimersByTime(61_000);
+		const snapshot = await getBazaarSnapshot(env.DB);
+		expect(snapshot.lastUpdated).toBe(packedUpdated);
+		expect(snapshot.products.WHEAT.qs.bp).toBe(42);
+	} finally {
+		vi.useRealTimers();
+	}
 });
 
 test('windowChanges yields first/last raw price in window', async () => {
@@ -358,6 +392,51 @@ test('bazaarSeriesSince returns each item ascending by t, unaffected by interlea
 	expect(series.get('SERIES_B')).toEqual([
 		{ t: since + 150, b: 2, s: 2 },
 		{ t: since + 250, b: 4, s: 4 }
+	]);
+});
+
+test('packed finalized and active-day history merges losslessly with legacy points', async () => {
+	const id = 'PACKED_ITEM';
+	const finalizedT = now - DAY - 300;
+	const activeT = now - 100;
+	const shard = shardFor(id, DAY_SHARDS.bazaar);
+	await env.DB.batch([
+		env.DB.prepare('INSERT INTO items (id, slug, name) VALUES (?, ?, ?)').bind(
+			id,
+			'packed-item',
+			'Packed Item'
+		),
+		env.DB.prepare(
+			'INSERT INTO bazaar_points (item, tier, t, buy, sell) VALUES (?, 0, ?, ?, ?)'
+		).bind(id, finalizedT - 300, 1, 0.5),
+		env.DB.prepare(
+			'INSERT INTO market_item_days (market, item, day, first_t, last_t, first_value, last_value, body) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+		).bind(
+			'bazaar',
+			id,
+			utcDay(finalizedT),
+			finalizedT,
+			finalizedT,
+			2,
+			2,
+			JSON.stringify([[finalizedT, 2, 1.5]])
+		),
+		env.DB.prepare(
+			'INSERT INTO market_day_shards (market, day, shard, updated, body) VALUES (?, ?, ?, ?, ?)'
+		).bind('bazaar', utcDay(activeT), shard, activeT, JSON.stringify({ [id]: [[activeT, 3, 2.5]] }))
+	]);
+
+	const series = await bazaarSeriesSince(env.DB, [id], now - 2 * DAY);
+	expect(series.get(id)).toEqual([
+		{ t: finalizedT - 300, b: 1, s: 0.5 },
+		{ t: finalizedT, b: 2, s: 1.5 },
+		{ t: activeT, b: 3, s: 2.5 }
+	]);
+	const json = await itemSeriesJson(env.DB, id);
+	expect(json.bazaar?.raw).toEqual([
+		[finalizedT - 300, 1, 0.5],
+		[finalizedT, 2, 1.5],
+		[activeT, 3, 2.5]
 	]);
 });
 

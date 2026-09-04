@@ -5,6 +5,7 @@ import {
 	writeAuctionRun,
 	readItemCatalog,
 	writeItemCatalog,
+	finalizePackedDays,
 	rollupAll,
 	pruneStaleSnapshots,
 	assertPopulated
@@ -21,6 +22,9 @@ import type { BazaarProductSnapshot, AuctionItemStats } from '../../../src/lib/m
 
 beforeEach(async () => {
 	await env.DB.batch([
+		env.DB.prepare('DELETE FROM market_item_days'),
+		env.DB.prepare('DELETE FROM market_day_shards'),
+		env.DB.prepare('DELETE FROM market_snapshot_shards'),
 		env.DB.prepare('DELETE FROM bazaar_points'),
 		env.DB.prepare('DELETE FROM bazaar_snapshot'),
 		env.DB.prepare('DELETE FROM auction_points'),
@@ -37,25 +41,35 @@ const snap = (bp: number, sp: number) => ({ qs: { bp, sp } }) as unknown as Baza
 const count = async (sql: string) => (await env.DB.prepare(sql).first<{ n: number }>())!.n;
 
 describe('writeBazaarRun', () => {
-	test('inserts raw points and snapshot rows, skips zero-priced products', async () => {
+	test('packs snapshots and lossless points into a bounded number of rows', async () => {
 		await writeBazaarRun(env.DB, 1_000_000_000_000, {
 			WHEAT: snap(10.5, 9.5),
 			DEAD: snap(0, 0)
 		});
-		expect(await count('SELECT COUNT(*) n FROM bazaar_points')).toBe(1);
-		expect(await count('SELECT COUNT(*) n FROM bazaar_snapshot')).toBe(2);
+		expect(await count('SELECT COUNT(*) n FROM bazaar_points')).toBe(0);
+		expect(await count("SELECT COUNT(*) n FROM market_snapshot_shards WHERE market='bazaar'")).toBe(
+			4
+		);
+		expect(await count("SELECT COUNT(*) n FROM market_day_shards WHERE market='bazaar'")).toBe(1);
+		const rows = await env.DB.prepare(
+			"SELECT body FROM market_day_shards WHERE market='bazaar'"
+		).all<{ body: string }>();
+		const body = Object.assign({}, ...rows.results.map((row) => JSON.parse(row.body)));
+		expect(body).toEqual({ WHEAT: [[1_000_000_000, 10.5, 9.5]] });
 		const meta = await env.DB.prepare("SELECT value FROM meta WHERE key='bazaar_updated'").first<{
 			value: string;
 		}>();
 		expect(meta!.value).toBe('1000000000000');
 	});
 
-	test('re-running the same lastUpdated is idempotent (PK dedup)', async () => {
+	test('re-running the same lastUpdated is idempotent', async () => {
 		await writeBazaarRun(env.DB, 1_000_000_000_000, { WHEAT: snap(10.5, 9.5) });
 		await writeBazaarRun(env.DB, 1_000_000_000_000, { WHEAT: snap(99, 99) });
-		expect(await count('SELECT COUNT(*) n FROM bazaar_points')).toBe(1);
-		const p = await env.DB.prepare('SELECT buy FROM bazaar_points').first<{ buy: number }>();
-		expect(p!.buy).toBe(10.5);
+		const rows = await env.DB.prepare(
+			"SELECT body FROM market_day_shards WHERE market='bazaar'"
+		).all<{ body: string }>();
+		const body = Object.assign({}, ...rows.results.map((row) => JSON.parse(row.body)));
+		expect(body.WHEAT).toEqual([[1_000_000_000, 10.5, 9.5]]);
 	});
 
 	test('registers items rows with slugs', async () => {
@@ -92,16 +106,20 @@ describe('writeAuctionRun', () => {
 			npc: 1_000_000
 		});
 
-		const snapRow = await env.DB.prepare(
-			"SELECT body, updated FROM auction_snapshot WHERE item='HYPERION'"
-		).first<{ body: string; updated: number }>();
-		expect(JSON.parse(snapRow!.body)).toEqual(stats);
-		expect(snapRow!.updated).toBe(1_000_000_000);
+		const snapshotRows = await env.DB.prepare(
+			"SELECT body, updated FROM market_snapshot_shards WHERE market='auctions'"
+		).all<{ body: string; updated: number }>();
+		const snapshot = Object.assign({}, ...snapshotRows.results.map((row) => JSON.parse(row.body)));
+		expect(snapshot.HYPERION).toEqual(stats);
+		expect(new Set(snapshotRows.results.map((row) => row.updated))).toEqual(
+			new Set([1_000_000_000_000])
+		);
 
-		const point = await env.DB.prepare(
-			"SELECT tier, lowest, median, count FROM auction_points WHERE item='HYPERION'"
-		).first<{ tier: number; lowest: number; median: number; count: number }>();
-		expect(point).toEqual({ tier: 0, lowest: 90_000_000, median: 95_000_000, count: 12 });
+		const historyRows = await env.DB.prepare(
+			"SELECT body FROM market_day_shards WHERE market='auctions'"
+		).all<{ body: string }>();
+		const history = Object.assign({}, ...historyRows.results.map((row) => JSON.parse(row.body)));
+		expect(history.HYPERION).toEqual([[1_000_000_000, 90_000_000, 95_000_000, 12]]);
 
 		const meta = await env.DB.prepare("SELECT value FROM meta WHERE key='auctions_updated'").first<{
 			value: string;
@@ -116,10 +134,26 @@ describe('writeAuctionRun', () => {
 			npc: number;
 		}>();
 		expect(updated!.npc).toBe(2_000_000);
-		expect(await count('SELECT COUNT(*) n FROM auction_points')).toBe(1);
+		let auctionHistory = Object.assign(
+			{},
+			...(
+				await env.DB.prepare("SELECT body FROM market_day_shards WHERE market='auctions'").all<{
+					body: string;
+				}>()
+			).results.map((row) => JSON.parse(row.body))
+		);
+		expect(auctionHistory.HYPERION).toHaveLength(1);
 
 		await writeAuctionRun(env.DB, 1_000_010_800_000, { HYPERION: stats });
-		expect(await count('SELECT COUNT(*) n FROM auction_points')).toBe(2);
+		auctionHistory = Object.assign(
+			{},
+			...(
+				await env.DB.prepare("SELECT body FROM market_day_shards WHERE market='auctions'").all<{
+					body: string;
+				}>()
+			).results.map((row) => JSON.parse(row.body))
+		);
+		expect(auctionHistory.HYPERION).toHaveLength(2);
 		expect((await readItemCatalog(env.DB)).HYPERION).toMatchObject({
 			name: 'Hyperion',
 			npc: 2_000_000
@@ -177,6 +211,63 @@ describe('writeAuctionRun', () => {
 		await expect(
 			writeAuctionRun(env.DB, 1_000_000_000_000, { 'BAZ-QUX': stats })
 		).rejects.toThrow();
+	});
+});
+
+describe('finalizePackedDays', () => {
+	test('transposes completed day shards into idempotent item/day rows without dropping samples', async () => {
+		const first = 1_000_000_000;
+		await writeBazaarRun(env.DB, first * 1000, { WHEAT: snap(10, 9) });
+		await writeBazaarRun(env.DB, (first + 300) * 1000, { WHEAT: snap(11, 10) });
+
+		expect(await finalizePackedDays(env.DB, first + DAY)).toBe(1);
+		expect(await count('SELECT COUNT(*) n FROM market_day_shards')).toBe(0);
+		const row = await env.DB.prepare(
+			"SELECT body FROM market_item_days WHERE market='bazaar' AND item='WHEAT'"
+		).first<{ body: string }>();
+		expect(JSON.parse(row!.body)).toEqual([
+			[first, 10, 9],
+			[first + 300, 11, 10]
+		]);
+
+		expect(await finalizePackedDays(env.DB, first + 2 * DAY)).toBe(0);
+		expect(await count('SELECT COUNT(*) n FROM market_item_days')).toBe(1);
+	});
+
+	test('re-finalizes a delayed shard by replacing the existing item/day body', async () => {
+		const first = 1_000_000_000;
+		await writeBazaarRun(env.DB, first * 1000, { WHEAT: snap(10, 9) });
+		await writeBazaarRun(env.DB, (first + 300) * 1000, { WHEAT: snap(11, 10) });
+		await finalizePackedDays(env.DB, first + DAY);
+
+		const delayed = first + 600;
+		await env.DB.prepare(
+			'INSERT INTO market_day_shards (market, day, shard, updated, body) VALUES (?, ?, ?, ?, ?)'
+		)
+			.bind(
+				'bazaar',
+				Math.floor(first / DAY) * DAY,
+				0,
+				delayed,
+				JSON.stringify({
+					WHEAT: [
+						[first, 10, 9],
+						[first + 300, 11, 10],
+						[delayed, 12, 11]
+					]
+				})
+			)
+			.run();
+
+		expect(await finalizePackedDays(env.DB, first + DAY)).toBe(1);
+		const row = await env.DB.prepare(
+			"SELECT body FROM market_item_days WHERE market='bazaar' AND item='WHEAT'"
+		).first<{ body: string }>();
+		expect(JSON.parse(row!.body)).toEqual([
+			[first, 10, 9],
+			[first + 300, 11, 10],
+			[delayed, 12, 11]
+		]);
 	});
 });
 

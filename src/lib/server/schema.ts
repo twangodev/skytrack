@@ -53,6 +53,48 @@ export const auctionSnapshots = sqliteTable('auction_snapshot', {
 	updated: integer('updated').notNull()
 });
 
+export const marketSnapshotShards = sqliteTable(
+	'market_snapshot_shards',
+	{
+		market: text('market', { enum: ['bazaar', 'auctions'] }).notNull(),
+		shard: integer('shard').notNull(),
+		updated: integer('updated').notNull(),
+		body: text('body', { mode: 'json' }).$type<Record<string, unknown>>().notNull()
+	},
+	(table) => [primaryKey({ columns: [table.market, table.shard] })]
+);
+
+export const marketDayShards = sqliteTable(
+	'market_day_shards',
+	{
+		market: text('market', { enum: ['bazaar', 'auctions'] }).notNull(),
+		day: integer('day').notNull(),
+		shard: integer('shard').notNull(),
+		updated: integer('updated').notNull(),
+		version: integer('version').notNull().default(0),
+		body: text('body', { mode: 'json' }).$type<Record<string, unknown>>().notNull()
+	},
+	(table) => [primaryKey({ columns: [table.market, table.day, table.shard] })]
+);
+
+export const marketItemDays = sqliteTable(
+	'market_item_days',
+	{
+		market: text('market', { enum: ['bazaar', 'auctions'] }).notNull(),
+		item: text('item').notNull(),
+		day: integer('day').notNull(),
+		firstT: integer('first_t').notNull(),
+		lastT: integer('last_t').notNull(),
+		firstValue: real('first_value').notNull(),
+		lastValue: real('last_value').notNull(),
+		body: text('body', { mode: 'json' }).$type<unknown[]>().notNull()
+	},
+	(table) => [
+		primaryKey({ columns: [table.market, table.item, table.day] }),
+		index('market_item_days_market_day').on(table.market, table.day, table.item)
+	]
+);
+
 export const metadata = sqliteTable('meta', {
 	key: text('key').primaryKey(),
 	value: text('value').notNull()

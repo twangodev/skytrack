@@ -19,6 +19,7 @@
 	import { formatPrice } from '$lib/format';
 	import type { Point } from '$lib/market/chart';
 	import { bucketOHLC, pickBucket, type Candle } from '$lib/market/ohlc';
+	import { loadMarketSeries } from '$lib/market/client';
 	import { mergedSeries, type ItemSeriesJson } from '$lib/market/series';
 	import CandleChart from '$lib/components/CandleChart.svelte';
 
@@ -38,25 +39,12 @@
 
 	const { current, unit = 'coins', slug, kind, primary, secondary }: Props = $props();
 
-	const seriesCache = new Map<string, Promise<ItemSeriesJson | null>>();
-	function loadSeries(itemSlug: string): Promise<ItemSeriesJson | null> {
-		let pending = seriesCache.get(itemSlug);
-		if (!pending) {
-			pending = fetch(`/data/items/${itemSlug}.json`)
-				.then((res) => (res.ok ? (res.json() as Promise<ItemSeriesJson>) : null))
-				.catch(() => null);
-			seriesCache.set(itemSlug, pending);
-		}
-		return pending;
-	}
-
 	let fetched = $state<ItemSeriesJson | null>(null);
 	$effect(() => {
 		const target = slug;
 		fetched = null;
 		if (!browser) return;
-		void loadSeries(target).then((data) => {
-			if (data === null) seriesCache.delete(target);
+		void loadMarketSeries(target).then((data) => {
 			if (target === slug) fetched = data;
 		});
 	});

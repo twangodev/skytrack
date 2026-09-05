@@ -151,6 +151,8 @@ test('itemSeriesJson hourly tier keeps only 4h-aligned points (t % 14400 = 0)', 
 	]);
 	const json = await itemSeriesJson(env.DB, 'HOURLY_TEST');
 	expect(json.bazaar!.hourly).toEqual([[aligned, 50, 40]]);
+	expect(json.bazaar!.summary?.sampleCount).toBe(2);
+	expect(json.bazaar!.summary?.high.value).toBe(60);
 });
 
 test('bazaarHistory includes raw points exactly at the 24h cap, excludes just past it', async () => {
@@ -644,6 +646,9 @@ test('combined page histories match separate chart and summary reads with legacy
 			(await auctionSummaryHistory(env.DB, id)).map((point) => ({ t: point.t, value: point.l }))
 		)
 	);
+	const series = await itemSeriesJson(env.DB, id);
+	expect(series.bazaar?.summary).toEqual(bazaar.summary);
+	expect(series.auctions?.summary).toEqual(auctions.summary);
 	expect(await bazaarPageHistory(env.DB, 'MISSING')).toEqual({ history: [], summary: null });
 	expect(await auctionPageHistory(env.DB, 'MISSING')).toEqual({ history: [], summary: null });
 });

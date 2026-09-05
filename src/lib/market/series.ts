@@ -1,3 +1,5 @@
+import type { HistorySummary } from './history-summary';
+
 export type BazaarTuple = [t: number, b: number, s: number];
 export type AuctionTuple = [t: number, l: number, m: number, c: number];
 
@@ -6,8 +8,13 @@ const DAY = 86_400;
 export const RAW_SLICE = 35 * DAY;
 
 export interface ItemSeriesJson {
-	bazaar?: { raw: BazaarTuple[]; hourly: BazaarTuple[]; daily: BazaarTuple[] };
-	auctions?: { raw: AuctionTuple[]; daily: AuctionTuple[] };
+	bazaar?: {
+		raw: BazaarTuple[];
+		hourly: BazaarTuple[];
+		daily: BazaarTuple[];
+		summary?: HistorySummary | null;
+	};
+	auctions?: { raw: AuctionTuple[]; daily: AuctionTuple[]; summary?: HistorySummary | null };
 }
 
 const CSV_HEADER = [

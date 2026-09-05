@@ -633,9 +633,7 @@ async function computeItemSeriesJson(db: Db, id: string): Promise<ItemSeriesJson
 				.prepare('SELECT t, buy, sell FROM bazaar_points WHERE item = ?1 AND tier = 0 ORDER BY t')
 				.bind(id),
 			db
-				.prepare(
-					'SELECT t, buy, sell FROM bazaar_points WHERE item = ?1 AND tier = 1 AND t % 14400 = 0 ORDER BY t'
-				)
+				.prepare('SELECT t, buy, sell FROM bazaar_points WHERE item = ?1 AND tier = 1 ORDER BY t')
 				.bind(id),
 			db
 				.prepare('SELECT t, buy, sell FROM bazaar_points WHERE item = ?1 AND tier = 2 ORDER BY t')
@@ -705,11 +703,22 @@ async function computeItemSeriesJson(db: Db, id: string): Promise<ItemSeriesJson
 
 	const out: ItemSeriesJson = {};
 	const bazaar = {
+		summary: summarizeHistory(
+			mergePoints(
+				[...b(bRaw.results), ...b(bHourly.results), ...b(bDaily.results)].map(([t, value]) => ({
+					t,
+					value
+				})),
+				(packedBazaar.get(id) ?? []).map(([t, value]) => ({ t, value }))
+			)
+		),
 		raw: exactBazaar
 			.filter((point) => point.t >= rawCutoff)
 			.map((point): BazaarTuple => [point.t, point.b, point.s]),
 		hourly: mergePoints(
-			b(bHourly.results).map(([t, buy, sell]) => ({ t, buy, sell })),
+			b(bHourly.results)
+				.filter(([t]) => t % (4 * HOUR) === 0)
+				.map(([t, buy, sell]) => ({ t, buy, sell })),
 			generatedHourly.map((point) => ({ t: point.t, buy: point.b, sell: point.s }))
 		).map((point): BazaarTuple => [point.t, point.buy, point.sell]),
 		daily: mergePoints(
@@ -719,6 +728,12 @@ async function computeItemSeriesJson(db: Db, id: string): Promise<ItemSeriesJson
 	};
 	if (bazaar.raw.length || bazaar.hourly.length || bazaar.daily.length) out.bazaar = bazaar;
 	const auctions = {
+		summary: summarizeHistory(
+			mergePoints(
+				[...a(aRaw.results), ...a(aDaily.results)].map(([t, value]) => ({ t, value })),
+				(packedAuctions.get(id) ?? []).map(([t, value]) => ({ t, value }))
+			)
+		),
 		raw: exactAuctions
 			.filter((point) => point.t >= rawCutoff)
 			.map((point): AuctionTuple => [point.t, point.l, point.m, point.c]),

@@ -2,10 +2,13 @@ import { env } from 'cloudflare:test';
 import { beforeEach, expect, test, vi } from 'vitest';
 import {
 	auctionHistory,
+	auctionPageHistory,
+	auctionSummaryHistory,
 	getAuctionItem,
 	getAuctionSnapshot,
 	auctionSparks,
 	bazaarHistory,
+	bazaarPageHistory,
 	getBazaarProduct,
 	getItemBySlug,
 	bazaarSeriesSince,
@@ -21,6 +24,7 @@ import {
 } from '../../../src/lib/server/db';
 import { DAY_SHARDS, SNAPSHOT_SHARDS, shardFor, utcDay } from '../../../src/lib/market/packed';
 
+import { summarizeHistory } from '../../../src/lib/market/history-summary';
 
 const DAY = 86_400;
 const now = Math.floor(Date.now() / 1000);
@@ -593,3 +597,74 @@ test('single-item active shard extraction matches multi-item reads for punctuati
 	expect(await bazaarHistory(env.DB, 'MISSING')).toEqual([]);
 });
 
+test('combined page histories match separate chart and summary reads with legacy tiers and packed overlap', async () => {
+	const id = 'WHEAT';
+	const t = now - 300;
+	await env.DB.batch([
+		env.DB.prepare(
+			'INSERT INTO bazaar_points (item, tier, t, buy, sell) VALUES (?, 2, ?, ?, ?)'
+		).bind(id, t, 15, 14),
+		env.DB.prepare(
+			'INSERT INTO auction_points (item, tier, t, lowest, median, count) VALUES (?, 0, ?, ?, ?, ?), (?, 2, ?, ?, ?, ?)'
+		).bind(id, t, 10, 11, 2, id, now - 10 * DAY, 4, 5, 1),
+		...(['bazaar', 'auctions'] as const).map((market) =>
+			env.DB.prepare(
+				'INSERT INTO market_day_shards (market, day, shard, updated, body) VALUES (?, ?, ?, ?, ?)'
+			).bind(
+				market,
+				utcDay(t),
+				shardFor(id, DAY_SHARDS[market]),
+				t,
+				JSON.stringify({
+					[id]:
+						market === 'bazaar'
+							? [
+									[t, 42, 41],
+									[now, 43, 42]
+								]
+							: [
+									[t, 42, 43, 2],
+									[now, 44, 45, 3]
+								]
+				})
+			)
+		)
+	]);
+	const bazaar = await bazaarPageHistory(env.DB, id);
+	expect(bazaar.history).toEqual(await bazaarHistory(env.DB, id));
+	expect(bazaar.summary).toEqual(
+		summarizeHistory(
+			(await bazaarSummaryHistory(env.DB, id)).map((point) => ({ t: point.t, value: point.b }))
+		)
+	);
+	const auctions = await auctionPageHistory(env.DB, id);
+	expect(auctions.history).toEqual(await auctionHistory(env.DB, id));
+	expect(auctions.summary).toEqual(
+		summarizeHistory(
+			(await auctionSummaryHistory(env.DB, id)).map((point) => ({ t: point.t, value: point.l }))
+		)
+	);
+	expect(await bazaarPageHistory(env.DB, 'MISSING')).toEqual({ history: [], summary: null });
+	expect(await auctionPageHistory(env.DB, 'MISSING')).toEqual({ history: [], summary: null });
+});
+
+test('computed page and export data are shared briefly and refresh after the TTL', async () => {
+	vi.useFakeTimers();
+	try {
+		vi.setSystemTime(new Date(now * 1000));
+		const [a, b] = await Promise.all([
+			itemSeriesJson(env.DB, 'WHEAT'),
+			itemSeriesJson(env.DB, 'WHEAT')
+		]);
+		expect(a).toBe(b);
+		const page = await bazaarPageHistory(env.DB, 'WHEAT');
+		await newRawPoint();
+		expect(await itemSeriesJson(env.DB, 'WHEAT')).toBe(a);
+		expect(await bazaarPageHistory(env.DB, 'WHEAT')).toBe(page);
+		vi.advanceTimersByTime(60_000);
+		expect((await itemSeriesJson(env.DB, 'WHEAT')).bazaar?.raw.at(-1)).toEqual([now - 100, 12, 11]);
+		expect((await bazaarPageHistory(env.DB, 'WHEAT')).summary?.lastTracked).toBe(now - 100);
+	} finally {
+		vi.useRealTimers();
+	}
+});

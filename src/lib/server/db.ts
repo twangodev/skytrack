@@ -8,6 +8,7 @@ import {
 	type AuctionTuple
 } from '../market/series';
 import { titleCase } from '../format';
+import { summarizeHistory } from '../market/history-summary';
 import { AsyncCache } from './async-cache';
 import {
 	HOURLY_WINDOW,
@@ -78,9 +79,13 @@ export function requireDb(platform: App.Platform | undefined): Db {
 }
 
 const cache = new AsyncCache(TTL_MS, 256);
+// A crawl touches thousands of items. Bound retained chart/series data by both
+// item count and point count, and never retain an oversized history result.
+const itemDataCache = new AsyncCache(TTL_MS, 32, 40_000);
 
 export function clearDbCache(): void {
 	cache.clear();
+	itemDataCache.clear();
 }
 
 const cached = <T>(key: string, compute: () => Promise<T>): Promise<T> => cache.get(key, compute);
@@ -436,6 +441,82 @@ export async function auctionSummaryHistory(db: Db, id: string): Promise<Auction
 	return mergePoints(legacy.results, (packed.get(id) ?? []).map(auctionPoint));
 }
 
+export function bazaarPageHistory(db: Db, id: string) {
+	return itemDataCache.get(
+		`page:bazaar:${id}`,
+		async () => {
+			const now = Math.floor(Date.now() / 1000);
+			const [legacy, packed] = await Promise.all([
+				db
+					.prepare(
+						'SELECT tier, t, buy AS b, sell AS s FROM bazaar_points WHERE item = ? ORDER BY tier, t'
+					)
+					.bind(id)
+					.all<BazaarHistoryPoint & { tier: number }>(),
+				packedSeries(db, 'bazaar', [id])
+			]);
+			let hourlyEnd = -Infinity;
+			for (const point of legacy.results)
+				if (point.tier === 1) hourlyEnd = Math.max(hourlyEnd, point.t);
+			const exact = (packed.get(id) ?? []).map(bazaarPoint);
+			const summaryPoints = mergePoints(
+				legacy.results.map(({ tier: _tier, ...point }) => point),
+				exact
+			);
+			const history = mergePoints(
+				legacy.results
+					.filter(
+						(point) =>
+							point.tier === 2 ||
+							(point.tier === 1 && point.t >= hourlyEnd - 7 * DAY) ||
+							(point.tier === 0 && point.t >= now - DAY)
+					)
+					.map(({ tier: _tier, ...point }) => point),
+				exact.filter((point) => point.t >= now - DAY)
+			);
+			return {
+				history,
+				summary: summarizeHistory(summaryPoints.map((point) => ({ t: point.t, value: point.b })))
+			};
+		},
+		(value) => value.history.length + 1
+	);
+}
+
+export function auctionPageHistory(db: Db, id: string) {
+	return itemDataCache.get(
+		`page:auctions:${id}`,
+		async () => {
+			const now = Math.floor(Date.now() / 1000);
+			const [legacy, packed] = await Promise.all([
+				db
+					.prepare(
+						'SELECT tier, t, lowest AS l, median AS m, count AS c FROM auction_points WHERE item = ? ORDER BY tier, t'
+					)
+					.bind(id)
+					.all<AuctionHistoryPoint & { tier: number }>(),
+				packedSeries(db, 'auctions', [id])
+			]);
+			const exact = (packed.get(id) ?? []).map(auctionPoint);
+			const summaryPoints = mergePoints(
+				legacy.results.map(({ tier: _tier, ...point }) => point),
+				exact
+			);
+			const history = mergePoints(
+				legacy.results
+					.filter((point) => point.tier === 2 || (point.tier === 0 && point.t >= now - 7 * DAY))
+					.map(({ tier: _tier, ...point }) => point),
+				exact.filter((point) => point.t >= now - 7 * DAY)
+			);
+			return {
+				history,
+				summary: summarizeHistory(summaryPoints.map((point) => ({ t: point.t, value: point.l })))
+			};
+		},
+		(value) => value.history.length + 1
+	);
+}
+
 export function bazaarWindowChanges(
 	db: Db,
 	since: number
@@ -530,7 +611,21 @@ async function auctionSeriesSince(
 	return out;
 }
 
-export async function itemSeriesJson(db: Db, id: string): Promise<ItemSeriesJson> {
+export function itemSeriesJson(db: Db, id: string): Promise<ItemSeriesJson> {
+	return itemDataCache.get(
+		`json:${id}`,
+		() => computeItemSeriesJson(db, id),
+		(value) =>
+			(value.bazaar?.raw.length ?? 0) +
+			(value.bazaar?.hourly.length ?? 0) +
+			(value.bazaar?.daily.length ?? 0) +
+			(value.auctions?.raw.length ?? 0) +
+			(value.auctions?.daily.length ?? 0) +
+			1
+	);
+}
+
+async function computeItemSeriesJson(db: Db, id: string): Promise<ItemSeriesJson> {
 	const now = Math.floor(Date.now() / 1000);
 	const [legacy, packedBazaar, packedAuctions] = await Promise.all([
 		db.batch([

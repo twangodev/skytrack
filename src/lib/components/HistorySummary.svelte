@@ -11,6 +11,9 @@
 		dataUrl: string;
 		csvUrl: string;
 		markdownUrl: string;
+		loading?: boolean;
+		failed?: boolean;
+		onretry?: () => void;
 	}
 
 	const {
@@ -21,7 +24,10 @@
 		summary,
 		dataUrl,
 		csvUrl,
-		markdownUrl
+		markdownUrl,
+		loading = false,
+		failed = false,
+		onretry
 	}: Props = $props();
 
 	const dateTime = (seconds: number) => new Date(seconds * 1000).toISOString();
@@ -41,7 +47,18 @@
 <section class="flex flex-col gap-3">
 	<div>
 		<h2 class="text-sm font-medium">Price history summary</h2>
-		{#if summary}
+		{#if loading || failed}
+			<p role="status" class="mt-1 text-sm text-muted">
+				{failed ? 'Price history could not be loaded.' : 'Loading price history summary…'}
+				{#if failed && onretry}
+					<button
+						type="button"
+						onclick={onretry}
+						class="cursor-pointer underline underline-offset-2 hover:text-text">Try again</button
+					>
+				{/if}
+			</p>
+		{:else if summary}
 			<p class="mt-1 text-sm leading-relaxed text-muted">
 				{itemName}
 				{marketLabel} price history tracks {metricLabel} and {secondaryMetricLabel}
@@ -117,15 +134,11 @@
 
 	<p class="text-xs text-muted">
 		Full historical data:
-		{#if summary}
-			<a href={dataUrl} class="underline decoration-subtle underline-offset-2 hover:text-text"
-				>JSON</a
-			>
-			<span aria-hidden="true"> · </span>
-			<a href={csvUrl} class="underline decoration-subtle underline-offset-2 hover:text-text">CSV</a
-			>
-			<span aria-hidden="true"> · </span>
-		{/if}
+		<a href={dataUrl} class="underline decoration-subtle underline-offset-2 hover:text-text">JSON</a
+		>
+		<span aria-hidden="true"> · </span>
+		<a href={csvUrl} class="underline decoration-subtle underline-offset-2 hover:text-text">CSV</a>
+		<span aria-hidden="true"> · </span>
 		<a href={markdownUrl} class="underline decoration-subtle underline-offset-2 hover:text-text"
 			>Markdown</a
 		>

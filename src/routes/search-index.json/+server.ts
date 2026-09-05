@@ -18,12 +18,14 @@ export const GET: RequestHandler = async ({ platform }) => {
 			slug: slugFromId(id),
 			name: items[id]?.name ?? titleCase(id),
 			kind: 'bazaar' as const,
+			tier: items[id]?.tier,
 			aliases: aliasesForItem(id)
 		})),
 		...Object.entries(auctions.items).map(([id, stats]) => ({
 			slug: slugFromId(id),
 			name: stats.name,
 			kind: 'auctions' as const,
+			tier: stats.tier,
 			aliases: aliasesForItem(id)
 		}))
 	];

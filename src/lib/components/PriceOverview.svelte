@@ -15,11 +15,9 @@
 	} from 'layerchart';
 	import { scaleTime } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
-	import { browser } from '$app/environment';
 	import { formatPrice } from '$lib/format';
 	import type { Point } from '$lib/market/chart';
 	import { bucketOHLC, pickBucket, type Candle } from '$lib/market/ohlc';
-	import { loadMarketSeries } from '$lib/market/client';
 	import { mergedSeries, type ItemSeriesJson } from '$lib/market/series';
 	import CandleChart from '$lib/components/CandleChart.svelte';
 
@@ -35,21 +33,27 @@
 		kind: 'bazaar' | 'auctions';
 		primary: Series;
 		secondary?: Series;
+		series: ItemSeriesJson | null;
+		loading?: boolean;
+		failed?: boolean;
+		onretry?: () => void;
 	}
 
-	const { current, unit = 'coins', slug, kind, primary, secondary }: Props = $props();
+	const {
+		current,
+		unit = 'coins',
+		slug,
+		kind,
+		primary,
+		secondary,
+		series,
+		loading = false,
+		failed = false,
+		onretry
+	}: Props = $props();
 
-	let fetched = $state<ItemSeriesJson | null>(null);
-	$effect(() => {
-		const target = slug;
-		fetched = null;
-		if (!browser) return;
-		void loadMarketSeries(target).then((data) => {
-			if (target === slug) fetched = data;
-		});
-	});
+	const merged = $derived(series ? mergedSeries(series, kind) : []);
 
-	const merged = $derived(fetched ? mergedSeries(fetched, kind) : []);
 	const primaryPoints = $derived.by((): Point[] => {
 		if (merged.length === 0) return primary.points;
 		const newest = merged[merged.length - 1][0];
@@ -192,7 +196,22 @@
 		</p>
 	</div>
 
-	{#if !enough || (style === 'candles' && candles.length < 2)}
+	{#if loading || failed}
+		<div
+			class="flex h-[220px] flex-col items-center justify-center gap-3 rounded-md border border-subtle bg-surface px-4 text-xs text-muted"
+		>
+			<p role="status">
+				{failed ? 'Price history could not be loaded.' : 'Loading price history…'}
+			</p>
+			{#if failed && onretry}
+				<button
+					type="button"
+					onclick={onretry}
+					class="cursor-pointer underline underline-offset-2 hover:text-text">Try again</button
+				>
+			{/if}
+		</div>
+	{:else if !enough || (style === 'candles' && candles.length < 2)}
 		<p class="rounded-md border border-subtle bg-surface px-4 py-10 text-center text-xs text-muted">
 			Not enough history yet. Check back after a few updates.
 		</p>

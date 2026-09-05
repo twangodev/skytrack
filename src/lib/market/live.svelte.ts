@@ -32,6 +32,12 @@ export class LiveMarket {
 		document.removeEventListener('visibilitychange', this.#onVisible);
 	}
 
+	async refresh(): Promise<void> {
+		this.loading = true;
+		this.failed = false;
+		await this.#poll();
+	}
+
 	#onVisible = () => {
 		if (!document.hidden) void this.#poll();
 	};

@@ -54,6 +54,8 @@ jobs:
         uses: oven-sh/setup-bun@v2
       - name: Install Dependencies
         run: bun install --frozen-lockfile
+      - name: Refresh item catalog
+        run: bun run catalog:refresh
       - name: Build
         run: bun run build
       - name: Upload Build

@@ -65,14 +65,24 @@ export const GET: RequestHandler = () => {
 												properties: {
 													raw: { type: 'array', items: bazaarTuple },
 													hourly: { type: 'array', items: bazaarTuple },
-													daily: { type: 'array', items: bazaarTuple }
+													daily: { type: 'array', items: bazaarTuple },
+													summary: {
+														type: ['object', 'null'],
+														description:
+															'Exact instabuy history summary before chart bucketing: sampleCount, firstTracked, lastTracked, low, high, day, and week.'
+													}
 												}
 											},
 											auctions: {
 												type: 'object',
 												properties: {
 													raw: { type: 'array', items: auctionTuple },
-													daily: { type: 'array', items: auctionTuple }
+													daily: { type: 'array', items: auctionTuple },
+													summary: {
+														type: ['object', 'null'],
+														description:
+															'Exact lowest BIN history summary before chart bucketing: sampleCount, firstTracked, lastTracked, low, high, day, and week.'
+													}
 												}
 											}
 										}

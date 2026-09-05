@@ -53,7 +53,7 @@ export function loadMarketIndex(): Promise<MarketItem[]> {
 export function loadMarketSeries(slug: string): Promise<ItemSeriesJson | null> {
 	let pending = seriesCache.get(slug);
 	if (!pending) {
-		pending = fetch(`/data/items/${slug}.json`)
+		pending = fetch(`/data/items/${slug}.json`, { signal: AbortSignal.timeout(20_000) })
 			.then((response) =>
 				response.ok ? (response.json() as Promise<ItemSeriesJson>) : Promise.resolve(null)
 			)
@@ -71,7 +71,9 @@ export function loadMarketSnapshot(slug: string): Promise<MarketSnapshotJson | n
 	const now = Date.now();
 	let entry = snapshotCache.get(slug);
 	if (!entry || entry.expiresAt <= now) {
-		const pending = fetch(`/data/items/${slug}/snapshot.json`)
+		const pending = fetch(`/data/items/${slug}/snapshot.json`, {
+			signal: AbortSignal.timeout(20_000)
+		})
 			.then((response) =>
 				response.ok ? (response.json() as Promise<MarketSnapshotJson>) : Promise.resolve(null)
 			)

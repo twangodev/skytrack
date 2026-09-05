@@ -63,7 +63,7 @@ export interface PriceHistoryDatasetOptions {
 	dataUrl: string;
 	csvUrl: string;
 	markdownUrl: string;
-	dateModified: string;
+	dateModified?: string;
 	variables: string[];
 	temporalCoverage?: string;
 }

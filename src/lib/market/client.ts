@@ -53,7 +53,8 @@ export function loadMarketIndex(): Promise<MarketItem[]> {
 export function loadMarketSeries(slug: string): Promise<ItemSeriesJson | null> {
 	let pending = seriesCache.get(slug);
 	if (!pending) {
-		pending = fetch(`/data/items/${slug}.json`, { signal: AbortSignal.timeout(20_000) })
+		// Avoid pre-deployment browser/edge entries that don't contain the history summary.
+		pending = fetch(`/data/items/${slug}.json?v=2`, { signal: AbortSignal.timeout(20_000) })
 			.then((response) =>
 				response.ok ? (response.json() as Promise<ItemSeriesJson>) : Promise.resolve(null)
 			)

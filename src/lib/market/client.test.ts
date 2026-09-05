@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
 	clearMarketSnapshotCache,
 	loadMarketSnapshot,
+	loadMarketSeries,
 	marketItemKey,
 	searchMarketItems,
 	type MarketItem
@@ -70,4 +71,25 @@ describe('loadMarketSnapshot', () => {
 		expect(await loadMarketSnapshot('wheat')).toEqual(response);
 		expect(fetcher).toHaveBeenCalledTimes(1);
 	});
+});
+
+test('history requests use the summary-aware cache key and retry failures', async () => {
+	const series = { bazaar: { raw: [], hourly: [], daily: [], summary: null } };
+	const fetcher = vi
+		.fn()
+		.mockResolvedValueOnce(new Response(null, { status: 503 }))
+		.mockResolvedValueOnce(new Response(JSON.stringify(series)));
+	vi.stubGlobal('fetch', fetcher);
+	try {
+		expect(await loadMarketSeries('summary-cache-test')).toBeNull();
+		expect(await loadMarketSeries('summary-cache-test')).toEqual(series);
+		expect(await loadMarketSeries('summary-cache-test')).toEqual(series);
+		expect(fetcher).toHaveBeenCalledTimes(2);
+		expect(fetcher).toHaveBeenLastCalledWith(
+			'/data/items/summary-cache-test.json?v=2',
+			expect.any(Object)
+		);
+	} finally {
+		vi.unstubAllGlobals();
+	}
 });

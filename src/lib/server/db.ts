@@ -8,6 +8,7 @@ import {
 	type AuctionTuple
 } from '../market/series';
 import { titleCase } from '../format';
+import { AsyncCache } from './async-cache';
 import {
 	HOURLY_WINDOW,
 	HOUR,
@@ -76,21 +77,50 @@ export function requireDb(platform: App.Platform | undefined): Db {
 	return platform.env.DB.withSession('first-unconstrained');
 }
 
-const cache = new Map<string, { at: number; value: unknown }>();
+const cache = new AsyncCache(TTL_MS, 256);
 
 export function clearDbCache(): void {
 	cache.clear();
 }
 
-async function cached<T>(key: string, compute: () => Promise<T>): Promise<T> {
-	const hit = cache.get(key);
-	if (hit && Date.now() - hit.at < TTL_MS) return hit.value as T;
-	const value = await compute();
-	const at = Date.now();
-	for (const [k, entry] of cache) if (at - entry.at >= TTL_MS) cache.delete(k);
-	cache.set(key, { at, value });
-	return value;
+const cached = <T>(key: string, compute: () => Promise<T>): Promise<T> => cache.get(key, compute);
+
+const itemJsonPath = (id: string): string => `$.${JSON.stringify(id)}`;
+
+async function itemSnapshot<T>(db: Db, market: MarketKind, id: string) {
+	return cached(
+		`snapshot:${market}:${id}`,
+		async (): Promise<{ lastUpdated: number; snapshot: T } | null> => {
+			// Check the entire generation, but return JSON for only the requested item.
+			// Incomplete/mixed generations must retain the bulk reader's legacy fallback.
+			const { results } = await db
+				.prepare(
+					`SELECT updated, CASE WHEN shard = ? THEN json_extract(body, ?) END AS body
+			 FROM market_snapshot_shards WHERE market = ? ORDER BY shard`
+				)
+				.bind(shardFor(id, SNAPSHOT_SHARDS[market]), itemJsonPath(id), market)
+				.all<{ updated: number; body: string | null }>();
+			if (
+				results.length === SNAPSHOT_SHARDS[market] &&
+				results.every((row) => row.updated === results[0].updated)
+			) {
+				const body = results.find((row) => row.body !== null)?.body;
+				return body ? { lastUpdated: results[0].updated, snapshot: JSON.parse(body) as T } : null;
+			}
+			const table = market === 'bazaar' ? 'bazaar_snapshot' : 'auction_snapshot';
+			const [row, lastUpdated] = await Promise.all([
+				db.prepare(`SELECT body FROM ${table} WHERE item = ?`).bind(id).first<{ body: string }>(),
+				metaMs(db, market === 'bazaar' ? 'bazaar_updated' : 'auctions_updated')
+			]);
+			return row ? { lastUpdated, snapshot: JSON.parse(row.body) as T } : null;
+		}
+	);
 }
+
+export const getBazaarProduct = (db: Db, id: string) =>
+	itemSnapshot<BazaarProductSnapshot>(db, 'bazaar', id);
+export const getAuctionItem = (db: Db, id: string) =>
+	itemSnapshot<AuctionItemStats>(db, 'auctions', id);
 
 async function packedSnapshot<T>(
 	db: Db,
@@ -147,15 +177,23 @@ async function packedSeries<M extends MarketKind>(
 
 	const shards = [...new Set(ids.map((id) => shardFor(id, DAY_SHARDS[market])))];
 	const placeholders = shards.map(() => '?').join(',');
+	const single = ids.length === 1;
 	const { results: active } = await db
 		.prepare(
-			`SELECT body FROM market_day_shards
+			`SELECT ${single ? 'json_extract(body, ?) AS body' : 'body'} FROM market_day_shards
 			 WHERE market = ? AND day >= ? AND shard IN (${placeholders})
 			 ORDER BY day, shard`
 		)
-		.bind(market, fromDay, ...shards)
-		.all<{ body: string }>();
+		.bind(...(single ? [itemJsonPath(ids[0])] : []), market, fromDay, ...shards)
+		.all<{ body: string | null }>();
 	for (const row of active) {
+		if (single) {
+			if (row.body === null) continue;
+			const points = out.get(ids[0]) ?? [];
+			points.push(...parseJsonArray<PackedPointByMarket[M]>(row.body).filter(([t]) => t >= since));
+			out.set(ids[0], points);
+			continue;
+		}
 		const body = parseJsonRecord<PackedPointByMarket[M][]>(row.body);
 		for (const [item, stored] of Object.entries(body)) {
 			if (!wanted.has(item)) continue;
@@ -264,8 +302,29 @@ async function itemsIndex(db: Db): Promise<ItemsIndex> {
 export const getItems = async (db: Db): Promise<Record<string, ItemMeta>> =>
 	(await itemsIndex(db)).byId;
 
+export function getItemBySlug(
+	db: Db,
+	slug: string
+): Promise<(ItemMeta & { id: string }) | undefined> {
+	return cached(`item:${slug}`, async () => {
+		const row = await useDrizzle(db)
+			.select()
+			.from(itemsTable)
+			.where(eq(itemsTable.slug, slug))
+			.get();
+		if (!row) return undefined;
+		return {
+			id: row.id,
+			name: row.name,
+			...(row.tier != null && { tier: row.tier }),
+			...(row.category != null && { category: row.category }),
+			...(row.npc != null && { npc: row.npc })
+		};
+	});
+}
+
 export const getItemIdBySlug = async (db: Db, slug: string): Promise<string | undefined> =>
-	(await itemsIndex(db)).slugToId.get(slug);
+	(await getItemBySlug(db, slug))?.id;
 
 async function metaMs(db: Db, key: string): Promise<number> {
 	const row = await useDrizzle(db)
@@ -311,13 +370,13 @@ export async function getAuctionSnapshot(db: Db): Promise<AuctionsFile> {
 export async function resolveBazaarId(db: Db, slug: string): Promise<string | undefined> {
 	const id = await getItemIdBySlug(db, slug);
 	if (!id) return undefined;
-	return (await getBazaarSnapshot(db)).products[id] ? id : undefined;
+	return (await getBazaarProduct(db, id)) ? id : undefined;
 }
 
 export async function resolveAuctionId(db: Db, slug: string): Promise<string | undefined> {
 	const id = await getItemIdBySlug(db, slug);
 	if (!id) return undefined;
-	return (await getAuctionSnapshot(db)).items[id] ? id : undefined;
+	return (await getAuctionItem(db, id)) ? id : undefined;
 }
 
 export async function bazaarHistory(db: Db, id: string): Promise<BazaarHistoryPoint[]> {

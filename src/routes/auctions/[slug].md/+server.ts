@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { requireDb, getAuctionSnapshot, resolveAuctionId, auctionHistory } from '$lib/server/db';
+import { requireDb, getAuctionItem, resolveAuctionId, auctionHistory } from '$lib/server/db';
 import { formatPrice } from '$lib/format';
 import { site } from '$lib/config';
 import type { RequestHandler } from './$types';
@@ -10,12 +10,10 @@ export const GET: RequestHandler = async ({ params, platform }) => {
 	const db = requireDb(platform);
 	const id = await resolveAuctionId(db, params.slug);
 	if (!id) error(404, 'Unknown item');
-	const [{ lastUpdated, items }, history] = await Promise.all([
-		getAuctionSnapshot(db),
-		auctionHistory(db, id)
-	]);
-	const stats = items[id];
-	if (!stats) error(404, 'Unknown item');
+	const [item, history] = await Promise.all([getAuctionItem(db, id), auctionHistory(db, id)]);
+	if (!item) error(404, 'Unknown item');
+
+	const { lastUpdated, snapshot: stats } = item;
 
 	const body = `# ${stats.name}
 

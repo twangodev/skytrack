@@ -2,8 +2,12 @@ import { env } from 'cloudflare:test';
 import { beforeEach, expect, test, vi } from 'vitest';
 import {
 	auctionHistory,
+	getAuctionItem,
+	getAuctionSnapshot,
 	auctionSparks,
 	bazaarHistory,
+	getBazaarProduct,
+	getItemBySlug,
 	bazaarSeriesSince,
 	bazaarSeriesSinceSql,
 	bazaarSparks,
@@ -16,6 +20,7 @@ import {
 	resolveBazaarId
 } from '../../../src/lib/server/db';
 import { DAY_SHARDS, SNAPSHOT_SHARDS, shardFor, utcDay } from '../../../src/lib/market/packed';
+
 
 const DAY = 86_400;
 const now = Math.floor(Date.now() / 1000);
@@ -464,3 +469,127 @@ test('read layer works through a D1 session (read replication path)', async () =
 		{ t: now - 300, b: 11, s: 10 }
 	]);
 });
+
+test('targeted metadata and legacy snapshots retain optional fields, timestamps and missing-item behavior', async () => {
+	await env.DB.prepare('UPDATE items SET tier = ?, category = ?, npc = ? WHERE id = ?')
+		.bind('COMMON', 'FARMING', 0, 'WHEAT')
+		.run();
+	expect(await getItemBySlug(env.DB, 'wheat')).toEqual({
+		id: 'WHEAT',
+		name: 'Wheat',
+		tier: 'COMMON',
+		category: 'FARMING',
+		npc: 0
+	});
+	expect(await getItemBySlug(env.DB, 'missing')).toBeUndefined();
+	const bulk = await getBazaarSnapshot(env.DB);
+	expect(await getBazaarProduct(env.DB, 'WHEAT')).toEqual({
+		lastUpdated: bulk.lastUpdated,
+		snapshot: bulk.products.WHEAT
+	});
+	expect(await getBazaarProduct(env.DB, 'OLD_ITEM')).toBeNull();
+	expect(await getAuctionItem(env.DB, 'WHEAT')).toBeNull();
+});
+
+test.each(['bazaar', 'auctions'] as const)(
+	'targeted %s snapshots preserve generation fallback and removed items',
+	async (market) => {
+		if (market === 'auctions') {
+			await env.DB.batch([
+				env.DB.prepare('INSERT INTO auction_snapshot (item, body, updated) VALUES (?, ?, ?)').bind(
+					'WHEAT',
+					JSON.stringify({ name: 'Wheat', tier: 'COMMON', lowestBin: 10, medianBin: 11, count: 2 }),
+					now
+				),
+				env.DB.prepare('INSERT INTO meta (key, value) VALUES (?, ?)').bind(
+					'auctions_updated',
+					String(now * 1000)
+				)
+			]);
+		}
+		const getOne = market === 'bazaar' ? getBazaarProduct : getAuctionItem;
+		const getAll = async () => {
+			if (market === 'bazaar') {
+				const value = await getBazaarSnapshot(env.DB);
+				return { updated: value.lastUpdated, values: value.products };
+			}
+			const value = await getAuctionSnapshot(env.DB);
+			return { updated: value.lastUpdated, values: value.items };
+		};
+		const id = 'ENCHANTMENT:POWER.7';
+		const snapshot =
+			market === 'bazaar'
+				? { qs: { bp: 42, sp: 41 }, buy: [], sell: [] }
+				: { name: 'Power', tier: 'RARE', lowestBin: 42, medianBin: 43, count: 2 };
+		const target = shardFor(id, SNAPSHOT_SHARDS[market]);
+		const packedUpdated = (now + 60) * 1000;
+		await env.DB.batch(
+			Array.from({ length: SNAPSHOT_SHARDS[market] }, (_, shard) =>
+				env.DB.prepare(
+					'INSERT INTO market_snapshot_shards (market, shard, updated, body) VALUES (?, ?, ?, ?)'
+				).bind(
+					market,
+					shard,
+					packedUpdated,
+					JSON.stringify(
+						shard === target
+							? { [id]: snapshot, 'ENCHANTMENT:POWER': { '7': { wrong: true } } }
+							: {}
+					)
+				)
+			)
+		);
+		let bulk = await getAll();
+		expect(await getOne(env.DB.withSession('first-unconstrained'), id)).toEqual({
+			lastUpdated: bulk.updated,
+			snapshot: bulk.values[id]
+		});
+		// A complete generation that omits WHEAT must not resurrect its legacy row.
+		expect(await getOne(env.DB, 'WHEAT')).toBeNull();
+		await env.DB.prepare(
+			'UPDATE market_snapshot_shards SET updated = updated + 1 WHERE market = ? AND shard = ?'
+		)
+			.bind(market, target)
+			.run();
+		clearDbCache();
+		bulk = await getAll();
+		expect(await getOne(env.DB, id)).toBeNull();
+		expect(await getOne(env.DB, 'WHEAT')).toEqual(
+			bulk.values.WHEAT ? { lastUpdated: bulk.updated, snapshot: bulk.values.WHEAT } : null
+		);
+		await env.DB.prepare('DELETE FROM market_snapshot_shards WHERE market = ? AND shard = ?')
+			.bind(market, target)
+			.run();
+		clearDbCache();
+		bulk = await getAll();
+		expect(await getOne(env.DB, 'WHEAT')).toEqual(
+			bulk.values.WHEAT ? { lastUpdated: bulk.updated, snapshot: bulk.values.WHEAT } : null
+		);
+	}
+);
+
+test('single-item active shard extraction matches multi-item reads for punctuation and ignores other entries', async () => {
+	const id = 'ENCHANTMENT:POWER.7';
+	const t = now - 100;
+	await env.DB.prepare(
+		'INSERT INTO market_day_shards (market, day, shard, updated, body) VALUES (?, ?, ?, ?, ?)'
+	)
+		.bind(
+			'bazaar',
+			utcDay(t),
+			shardFor(id, DAY_SHARDS.bazaar),
+			t,
+			JSON.stringify({ [id]: [[t, 8, 7]], 'ENCHANTMENT:POWER': { '7': [[t, 999, 999]] } })
+		)
+		.run();
+	const single = await bazaarSeriesSince(env.DB, [id], now - DAY);
+	const multi = await bazaarSeriesSince(env.DB, [id, 'WHEAT'], now - DAY);
+	expect(single.get(id)).toEqual([{ t, b: 8, s: 7 }]);
+	expect(single.get(id)).toEqual(multi.get(id));
+	const missing = Array.from({ length: 1_000 }, (_, i) => `MISSING_${i}`).find(
+		(candidate) => shardFor(candidate, DAY_SHARDS.bazaar) === shardFor(id, DAY_SHARDS.bazaar)
+	)!;
+	expect((await bazaarSeriesSince(env.DB, [missing], now - DAY)).has(missing)).toBe(false);
+	expect(await bazaarHistory(env.DB, 'MISSING')).toEqual([]);
+});
+

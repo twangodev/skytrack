@@ -1,8 +1,8 @@
 import { error } from '@sveltejs/kit';
 import {
 	requireDb,
-	getBazaarSnapshot,
-	getItems,
+	getBazaarProduct,
+	getItemBySlug,
 	resolveBazaarId,
 	bazaarHistory,
 	bazaarSeriesSince
@@ -20,15 +20,14 @@ export const GET: RequestHandler = async ({ params, platform }) => {
 	const id = await resolveBazaarId(db, params.slug);
 	if (!id) error(404, 'Unknown product');
 	const now = Math.floor(Date.now() / 1000);
-	const [{ lastUpdated, products }, items, rawSeries, history] = await Promise.all([
-		getBazaarSnapshot(db),
-		getItems(db),
+	const [product, meta, rawSeries, history] = await Promise.all([
+		getBazaarProduct(db, id),
+		getItemBySlug(db, params.slug),
 		bazaarSeriesSince(db, [id], now - 2 * DAY),
 		bazaarHistory(db, id)
 	]);
-	const snap = products[id];
-	if (!snap) error(404, 'Unknown product');
-	const meta = items[id];
+	if (!product) error(404, 'Unknown product');
+	const { lastUpdated, snapshot: snap } = product;
 	const name = meta?.name ?? titleCase(id);
 
 	const raw = rawSeries.get(id) ?? [];

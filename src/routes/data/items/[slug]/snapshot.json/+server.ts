@@ -1,11 +1,5 @@
 import { error, json } from '@sveltejs/kit';
-import {
-	getAuctionSnapshot,
-	getBazaarSnapshot,
-	getItemIdBySlug,
-	getItems,
-	requireDb
-} from '$lib/server/db';
+import { getAuctionItem, getBazaarProduct, getItemBySlug, requireDb } from '$lib/server/db';
 import { getLiveBazaarProduct } from '$lib/server/live-market';
 import type { MarketSnapshotJson } from '$lib/market/client';
 import type { RequestHandler } from './$types';
@@ -14,25 +8,18 @@ const AUCTION_FRESH_MS = 20 * 60_000;
 
 export const GET: RequestHandler = async ({ params, platform, fetch, setHeaders }) => {
 	const db = requireDb(platform);
-	const id = await getItemIdBySlug(db, params.slug);
-	if (!id) error(404, 'Unknown item');
-
-	const [items, bazaar, auctions] = await Promise.all([
-		getItems(db),
-		getBazaarSnapshot(db),
-		getAuctionSnapshot(db)
-	]);
-	const liveBazaar = bazaar.products[id]
-		? await getLiveBazaarProduct(fetch, id).catch(() => null)
-		: null;
+	const item = await getItemBySlug(db, params.slug);
+	if (!item) error(404, 'Unknown item');
+	const id = item.id;
+	const [bazaar, auctions] = await Promise.all([getBazaarProduct(db, id), getAuctionItem(db, id)]);
+	const liveBazaar = bazaar ? await getLiveBazaarProduct(fetch, id).catch(() => null) : null;
 	const bazaarSnapshot =
-		liveBazaar ??
-		(bazaar.products[id] ? { updatedAt: bazaar.lastUpdated, snapshot: bazaar.products[id] } : null);
-	const auctionSnapshot = auctions.items[id]
-		? { updatedAt: auctions.lastUpdated, snapshot: auctions.items[id] }
+		liveBazaar ?? (bazaar ? { updatedAt: bazaar.lastUpdated, snapshot: bazaar.snapshot } : null);
+	const auctionSnapshot = auctions
+		? { updatedAt: auctions.lastUpdated, snapshot: auctions.snapshot }
 		: null;
 	const response: MarketSnapshotJson = {
-		name: items[id]?.name ?? id,
+		name: item.name,
 		...(bazaarSnapshot && {
 			bazaar: { ...bazaarSnapshot, live: liveBazaar !== null }
 		}),
